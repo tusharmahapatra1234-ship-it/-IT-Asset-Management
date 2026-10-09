@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Asset Manager — Hardware Resource Tracking System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" onclick="switchToView('dashboard')" style="cursor: pointer;" title="Back to Home Dashboard">
+                <div class="logo-icon">💻</div>
+                <div class="brand-text">
+                    <h2>AssetManager</h2>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <div class="nav-section-title">Navigation</div>
+                <a href="#" class="nav-item active" id="navDashboardView" data-view="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" id="navAllocationsView" data-view="allocations">
+                    <span class="nav-icon">👥</span>
+                    <span>Device Allocations</span>
+                </a>
+                <a href="#" class="nav-item" id="navActiveAssignmentsView">
+                    <span class="nav-icon">📋</span>
+                    <span>Active Assignments</span>
+                </a>
+                <a href="#" class="nav-item" id="navRecentAllocationsView">
+                    <span class="nav-icon">⚡</span>
+                    <span>Recent Allocations</span>
+                </a>
+                <a href="#" class="nav-item" id="navEmailLogsView">
+                    <span class="nav-icon">📧</span>
+                    <span>Sent Email Logs</span>
+                </a>
+
+                <div class="nav-section-title">Quick Actions</div>
+                <a href="#" class="nav-item" id="btnQuickAdd">
+                    <span class="nav-icon">➕</span>
+                    <span>Add New Asset</span>
+                </a>
+                <a href="#" class="nav-item" id="btnExportCsv">
+                    <span class="nav-icon">📊</span>
+                    <span>Export CSV</span>
+                </a>
+                <a href="#" class="nav-item" id="btnExportPdf">
+                    <span class="nav-icon">📄</span>
+                    <span>Export PDF</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Toast Notification Container -->
+            <div id="toastContainer" class="toast-container"></div>
+
+            <!-- VIEW 1: Main Overview Dashboard -->
+            <div id="dashboardViewSection" class="view-section active">
+                <!-- Top Header -->
+                <header class="top-bar">
+                    <div class="page-title">
+                        <h1>IT Asset Management</h1>
+                        <p>Track, allocate, and optimize company hardware devices in real time</p>
+                    </div>
+                    <div class="top-actions" style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button class="btn btn-secondary" id="openSmtpModalBtn" title="Configure Real Email SMTP Server Settings">
+                            ⚙️ Email Settings
+                        </button>
+                        <button class="btn btn-secondary" id="themeToggleBtn" title="Toggle Light/Dark Theme">
+                            <span id="themeToggleIcon">🌙</span> <span id="themeToggleText">Dark Mode</span>
+                        </button>
+                        <button class="btn btn-primary" id="openAddModalBtn">
+                            <span class="btn-icon">+</span> Add New Asset
+                        </button>
+                    </div>
+                </header>
+
+                <!-- KPI Stats Cards Grid -->
+                <section class="kpi-grid">
+                    <div class="kpi-card kpi-total">
+                        <div class="kpi-icon">📦</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Total Assets</span>
+                            <h2 id="kpiTotal" class="kpi-value">0</h2>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-available">
+                        <div class="kpi-icon">✅</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Available</span>
+                            <h2 id="kpiAvailable" class="kpi-value">0</h2>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-allocated">
+                        <div class="kpi-icon">👤</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Allocated</span>
+                            <h2 id="kpiAllocated" class="kpi-value">0</h2>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-damaged">
+                        <div class="kpi-icon">🛠️</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Damaged</span>
+                            <h2 id="kpiDamaged" class="kpi-value">0</h2>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-warranty" id="kpiWarrantyCard" style="border-left: 4px solid #f59e0b; cursor: pointer;" title="Click to filter assets expiring in next 30 days">
+                        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">⚠️</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Warranty Alerts</span>
+                            <h2 id="kpiWarranty" class="kpi-value" style="color: #f59e0b;">0</h2>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Warranty Expiry High-Priority Banner -->
+                <div id="warrantyAlertBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 1.25rem;">⚠️</span>
+                        <div>
+                            <strong style="color: #f59e0b; font-size: 0.9rem;">Warranty Expiry Warning Notice:</strong>
+                            <span id="warrantyBannerText" style="color: var(--text-muted); font-size: 0.82rem; margin-left: 0.35rem;">Some hardware devices have warranties expiring in the next 30 days or already expired.</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-xs" id="btnFilterWarrantyAlerts" style="font-size: 0.75rem;">View Alert Items</button>
+                </div>
+
+                <!-- 📊 Visual Charts & Analytics Dashboard Section -->
+                <section class="analytics-charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+                    <div class="chart-card-premium">
+                        <div class="chart-header">
+                            <div>
+                                <h3 class="chart-title">📦 Category Distribution</h3>
+                                <span class="chart-subtitle">Hardware inventory by category</span>
+                            </div>
+                            <span class="chart-badge">Live Data</span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card-premium">
+                        <div class="chart-header">
+                            <div>
+                                <h3 class="chart-title">🏢 Dept Equipment Cost</h3>
+                                <span class="chart-subtitle">Cost breakdown by department (₹)</span>
+                            </div>
+                            <span class="chart-badge yellow">Value Analytics</span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="departmentCostChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card-premium">
+                        <div class="chart-header">
+                            <div>
+                                <h3 class="chart-title">⚡ Asset Status Breakdown</h3>
+                                <span class="chart-subtitle">Inventory health breakdown</span>
+                            </div>
+                            <span class="chart-badge green">Real-Time</span>
+                        </div>
+                        <div class="chart-canvas-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Search & Filters Toolbar -->
+                <section class="toolbar-card">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="searchInput" placeholder="Search by asset name, serial, vendor, location, or employee..." autocomplete="off">
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="categoryFilter" class="custom-select">
+                            <option value="">All Categories</option>
+                            <option value="Laptop">Laptop</option>
+                            <option value="Monitor">Monitor</option>
+                            <option value="IoT Dev Kit">IoT Dev Kit</option>
+                            <option value="Phone">Phone</option>
+                            <option value="Accessories">Accessories</option>
+                        </select>
+
+                        <select id="statusFilter" class="custom-select">
+                            <option value="">All Statuses</option>
+                            <option value="Available">Available</option>
+                            <option value="Allocated">Allocated</option>
+                            <option value="Damaged">Damaged</option>
+                        </select>
+
+                        <button id="resetFiltersBtn" class="btn btn-secondary btn-icon-only" title="Reset Filters">🔄</button>
+                    </div>
+                </section>
+
+                <!-- Hardware Asset Table Section (Clean Full-Width Main Dashboard) -->
+                <section class="panel asset-table-panel">
+                    <div class="panel-header">
+                        <h2>Hardware Assets Inventory</h2>
+                        <span id="assetCountBadge" class="badge-count">0 items</span>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset Details</th>
+                                    <th>Serial & Vendor</th>
+                                    <th>Category & Location</th>
+                                    <th>Status</th>
+                                    <th>Cost & Warranty</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetsTableBody">
+                                <!-- Dynamic JS Render -->
+                            </tbody>
+                        </table>
+                        <div id="emptyState" class="empty-state" style="display: none;">
+                            <div class="empty-icon">🔍</div>
+                            <h3>No Assets Found</h3>
+                            <p>Try adjusting your search criteria or add a new asset to get started.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- VIEW 2: Dedicated Device Allocations Directory Page -->
+            <div id="allocationsViewSection" class="view-section" style="display: none;">
+                <!-- Allocations Page Header -->
+                <header class="top-bar">
+                    <div class="page-title">
+                        <h1>Device Allocations Directory</h1>
+                        <p>Complete active & historical employee device assignments</p>
+                    </div>
+                    <div class="top-actions">
+                        <button class="btn btn-secondary" onclick="switchToView('dashboard')">
+                            &larr; Back to Dashboard
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Allocations Toolbar -->
+                <section class="toolbar-card">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="allocSearchInput" placeholder="Search allocation by employee, ID, department, or device..." autocomplete="off">
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="allocDeptFilter" class="custom-select">
+                            <option value="">All Departments</option>
+                            <option value="Engineering">Engineering</option>
+                            <option value="Human Resources">Human Resources</option>
+                            <option value="Product">Product</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Design">Design</option>
+                        </select>
+
+                        <button id="resetAllocFiltersBtn" class="btn btn-secondary btn-icon-only" title="Reset Filters">🔄</button>
+                    </div>
+                </section>
+
+                <!-- Allocations Full Table Panel -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Active Hardware Allocations</h2>
+                        <span id="allocCountBadge" class="badge-count">0 assignments</span>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee Details</th>
+                                    <th>Hardware Device</th>
+                                    <th>Serial & Category</th>
+                                    <th>Department</th>
+                                    <th>Allocation Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allocationsFullTableBody">
+                                <!-- Dynamic JS Render -->
+                            </tbody>
+                        </table>
+                        <div id="allocEmptyState" class="empty-state" style="display: none;">
+                            <div class="empty-icon">👥</div>
+                            <h3>No Active Allocations</h3>
+                            <p>No device allocations found matching your filter criteria.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- VIEW 3: Dedicated Sent Email Notification Logs Page -->
+            <div id="emailLogsViewSection" class="view-section" style="display: none;">
+                <!-- Email Logs Page Header -->
+                <header class="top-bar">
+                    <div class="page-title">
+                        <h1>📧 Sent Email Notification Logs</h1>
+                        <p>Automated system notifications sent to employees upon device allocation</p>
+                    </div>
+                    <div class="top-actions">
+                        <button class="btn btn-secondary" onclick="switchToView('dashboard')">
+                            &larr; Back to Dashboard
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Automated Email Logs Table Section -->
+                <section class="panel email-logs-panel">
+                    <div class="panel-header">
+                        <h2>Automated System Logs</h2>
+                        <span class="badge-pill">Real-time Email Dispatches</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee Name</th>
+                                    <th>Notification Subject</th>
+                                    <th>Recipient Email</th>
+                                    <th>Sent At</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="emailLogsTableBody">
+                                <!-- Dynamic JS Render -->
+                            </tbody>
+                        </table>
+                        <div id="emailLogsEmptyState" class="empty-state" style="display: none;">
+                            <div class="empty-icon">📧</div>
+                            <h3>No Email Logs Found</h3>
+                            <p>Allocate an asset to generate the first automated email notification log.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: Add New Asset -->
+    <div id="addAssetModal" class="modal-backdrop">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Add New Hardware Asset</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="addAssetForm">
+                <div class="modal-body">
+                    <!-- AI OCR Scanner Dropzone -->
+                    <div class="ocr-scanner-container">
+                        <div class="ocr-header">
+                            <div class="ocr-title-badge">
+                                <span class="ocr-sparkle">✨</span>
+                                <span>AI OCR Smart Auto-Fill</span>
+                            </div>
+                            <span class="ocr-sub-info">Drop invoice or device serial label to auto-populate form</span>
+                        </div>
+                        <div class="ocr-dropzone" id="ocrDropzone">
+                            <input type="file" id="ocrFileInput" accept="image/*" style="display: none;">
+                            <div class="ocr-idle-state" id="ocrIdleState">
+                                <div class="ocr-icon-circle">📷</div>
+                                <div class="ocr-text-group">
+                                    <strong>Click or Drag Invoice / Serial Label Photo</strong>
+                                    <p>AI scans text & extracts Serial, Model, Price, Vendor & Dates automatically</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('ocrFileInput').click()">
+                                    🔍 Select Image
+                                </button>
+                            </div>
+                            <div class="ocr-loading-state" id="ocrLoadingState" style="display: none;">
+                                <div class="ocr-pulse-spinner"></div>
+                                <div class="ocr-status">
+                                    <strong id="ocrStatusTitle">AI OCR Processing Image...</strong>
+                                    <p id="ocrStatusSub">Extracting text & parsing hardware specifications</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="asset_name">Asset Name / Model *</label>
+                        <input type="text" id="asset_name" required placeholder="e.g., MacBook Pro 16 M3 Max">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="serial_number">Serial Number *</label>
+                            <input type="text" id="serial_number" required placeholder="e.g., MBP16M3202699">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category">Category *</label>
+                            <select id="category" required>
+                                <option value="" disabled selected>Select Category</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Monitor">Monitor</option>
+                                <option value="IoT Dev Kit">IoT Dev Kit</option>
+                                <option value="Phone">Phone</option>
+                                <option value="Accessories">Accessories</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="status">Initial Status</label>
+                            <select id="status">
+                                <option value="Available" selected>Available</option>
+                                <option value="Damaged">Damaged</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="purchase_date">Purchase Date *</label>
+                            <input type="date" id="purchase_date" required>
+                        </div>
+                    </div>
+
+                    <!-- Additional Asset Fields -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="price">Purchase Price / Cost (₹) *</label>
+                            <input type="number" id="price" placeholder="e.g., 149999" step="0.01">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="vendor">Vendor / Supplier</label>
+                            <input type="text" id="vendor" placeholder="e.g., Apple India Store, Dell">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="warranty_expiry">Warranty Expiry Date</label>
+                            <input type="date" id="warranty_expiry">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="location">Office Location / Branch</label>
+                            <input type="text" id="location" placeholder="e.g., Mumbai HQ, Bangalore, Remote">
+                        </div>
+                    </div>
+
+                    <!-- New Fields: Contact Phone & Internal Asset Tag -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contact_phone">📞 Support / Vendor Phone Number</label>
+                            <input type="tel" id="contact_phone" placeholder="e.g., +91 98765 43210">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="asset_tag">🏷️ Internal Asset Tag / Barcode</label>
+                            <input type="text" id="asset_tag" placeholder="e.g., TAG-2026-8801">
+                        </div>
+                    </div>
+
+                    <!-- New Fields: Health Condition & Invoice Number -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="condition">🛠️ Physical Condition / Health</label>
+                            <select id="condition">
+                                <option value="Brand New" selected>Brand New</option>
+                                <option value="Excellent">Excellent</option>
+                                <option value="Good (Refurbished)">Good (Refurbished)</option>
+                                <option value="Fair">Fair</option>
+                                <option value="Needs Maintenance">Needs Maintenance</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="invoice_number">📄 Invoice / PO Number</label>
+                            <input type="text" id="invoice_number" placeholder="e.g., INV-2026-9871">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="mac_address">🌐 Network MAC / IP Address</label>
+                            <input type="text" id="mac_address" placeholder="e.g., 00:1B:44:11:3A:B7">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="notes">Notes / Specifications</label>
+                            <input type="text" id="notes" placeholder="e.g., 32GB RAM, 1TB SSD, Space Black">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Allocate Asset -->
+    <div id="allocateModal" class="modal-backdrop">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Allocate Asset to Employee</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="allocateForm">
+                <input type="hidden" id="alloc_asset_id">
+                <div class="modal-body">
+                    <div class="target-device-preview">
+                        <div class="device-preview-icon">💻</div>
+                        <div class="device-preview-info">
+                            <h4 id="allocPreviewName">MacBook Pro</h4>
+                            <p><span id="allocPreviewSerial">SN: 12345</span> | <span id="allocPreviewCategory">Laptop</span></p>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employee_id">Employee ID *</label>
+                            <input type="text" id="employee_id" required placeholder="e.g., EMP1024">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="employee_name">Employee Name *</label>
+                            <input type="text" id="employee_name" required placeholder="e.g., Amit Sharma">
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(250, 204, 21, 0.08); border: 1px solid rgba(250, 204, 21, 0.2); padding: 0.6rem 0.85rem; border-radius: 6px; margin-bottom: 0.85rem; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span>📧 <strong>Real Email Delivery:</strong> Mail will be sent directly to employee inbox.</span>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="openSmtpConfigFromAlloc()" style="font-size: 0.7rem; padding: 0.15rem 0.45rem;">⚙️ Setup Sender Gmail</button>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employee_email">Employee Email *</label>
+                            <input type="email" id="employee_email" required placeholder="e.g., amit.sharma@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="employee_phone">Employee Phone Number (for SMS) *</label>
+                            <input type="tel" id="employee_phone" required placeholder="e.g., +91 9876543210">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="employee_department">Department *</label>
+                            <input type="text" id="employee_department" required placeholder="e.g., Engineering">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="allocated_date">Allocation Date *</label>
+                            <input type="date" id="allocated_date" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-success">Confirm Allocation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: HTML Email Live Viewer -->
+    <div id="emailPreviewModal" class="modal-backdrop">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="emailModalSubject">HTML Email Notification</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe id="emailIframe" class="email-preview-iframe"></iframe>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close-btn">Close Preview</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: Real Email SMTP Settings -->
+    <div id="smtpModal" class="modal-backdrop">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3>⚙️ Real Email SMTP Settings</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="smtpConfigForm">
+                <div class="modal-body">
+                    <div style="background: rgba(250, 204, 21, 0.06); border: 1px solid rgba(250, 204, 21, 0.2); padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--text-main);">
+                        <strong style="color: var(--accent-yellow);">💡 Send Real Emails directly to employee Gmail/Inbox:</strong>
+                        <p style="color: var(--text-muted); margin-top: 0.25rem; line-height: 1.4;">
+                            Enter your Gmail address & <strong>16-character Gmail App Password</strong>. Google requires an App Password (not your normal password) to send emails via Node.js.
+                            <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: var(--accent-yellow); font-weight: 700; text-decoration: underline;">Get Gmail App Password &rarr;</a>
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtp_preset">Email Provider Preset</label>
+                        <select id="smtp_preset">
+                            <option value="gmail" selected>Gmail (smtp.gmail.com)</option>
+                            <option value="outlook">Outlook / Office365 (smtp.office365.com)</option>
+                            <option value="yahoo">Yahoo Mail (smtp.mail.yahoo.com)</option>
+                            <option value="custom">Custom SMTP Server</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="smtp_user">Sender Email Address *</label>
+                            <input type="email" id="smtp_user" required placeholder="e.g., your.email@gmail.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="smtp_pass">Gmail App Password / SMTP Password *</label>
+                            <input type="password" id="smtp_pass" required placeholder="16-character Gmail App Password">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="smtp_host">SMTP Host Server</label>
+                            <input type="text" id="smtp_host" value="smtp.gmail.com" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="smtp_port">SMTP Port</label>
+                            <input type="number" id="smtp_port" value="587" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtp_from_name">Sender Display Name</label>
+                        <input type="text" id="smtp_from_name" value="IT Operations Asset Manager" placeholder="e.g., Company IT Department">
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.25rem 0;">
+
+                    <!-- Test Email Trigger Section -->
+                    <div style="background: var(--bg-input); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <strong style="font-size: 0.84rem; color: var(--text-main);">🧪 Send Real Test Email:</strong>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <input type="email" id="test_recipient_email" placeholder="Enter your email to receive test message (e.g., your.email@gmail.com)" style="flex: 1;">
+                            <button type="button" class="btn btn-secondary btn-xs" id="btnSendTestEmail" style="white-space: nowrap;">
+                                📨 Send Test Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save SMTP Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- jsPDF and AutoTable libraries for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
