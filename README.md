@@ -118,23 +118,32 @@ flowchart LR
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/stats` | Returns aggregated KPI stats (total, available, allocated, damaged, total value, expiring warranty count). |
-| `GET` | `/api/assets` | Returns list of assets with optional `category`, `status`, `search`, `warranty_alert` filters. |
-| `POST` | `/api/assets` | Registers a new hardware asset in the database. |
-| `PUT` | `/api/assets/:id` | Updates asset details. |
-| `DELETE` | `/api/assets/:id` | Soft-deletes / removes an asset record. |
-| `POST` | `/api/assets/:id/allocate` | Allocates asset to employee with phone number & triggers email/SMS notifications. |
-| `POST` | `/api/assets/:id/deallocate` | Deallocates asset back to 'Available' status. |
-| `PUT` | `/api/assets/:id/status` | Updates asset operational status (Available / Allocated / Damaged). |
-| `GET` | `/api/allocations` | Returns all active & historic device allocations. |
-| `GET` | `/api/smtp-config` | Returns current SMTP email server configuration (password masked). |
-| `POST` | `/api/smtp-config` | Updates SMTP server credentials. |
-| `POST` | `/api/test-email` | Dispatches a test transactional email to verify SMTP configuration. |
-| `GET` | `/api/email-logs` | Returns recent email dispatch audit logs. |
+| `GET` | `/api/stats` | Aggregated KPI fleet metrics (total assets, available, allocated, damaged, total inventory value in ₹, expiring warranty count). |
+| `GET` | `/api/assets` | Query hardware assets with optional search query, category, status, and warranty alert filters. |
+| `POST` | `/api/assets` | Registers a new enterprise hardware asset (supports manual or OCR auto-fill). |
+| `PATCH` | `/api/assets/:id/status` | Updates asset operational status (`Available`, `Allocated`, `Damaged`, `Under Maintenance`). |
+| `DELETE` | `/api/assets/:id` | Safely removes an asset record from inventory. |
+| `POST` | `/api/assets/:id/allocate` | Allocates asset to employee with phone tracking, dispatches transactional HTML email & SMS alert. |
+| `POST` | `/api/assets/:id/deallocate` | Returns allocated device back to available inventory. |
+| `POST` | `/api/assets/:id/report-damage` | **🚨 AI Damage Diagnosis**: Logs damage report, evaluates root-cause fault mechanism, recalibrates health score (0-100%), assesses safety risks, and estimates repair cost. |
+| `GET` | `/api/assets/:id/damage-history` | Retrieves logged damage incidents and historic AI diagnostic evaluations for an asset. |
+| `GET` | `/api/assets/:id/diagnostics` | Single-asset ML predictive health breakdown, failure probability %, remaining useful life (months), and risk factors. |
+| `POST` | `/api/ai/chat` | **🤖 AssetBot AI Assistant**: Hybrid conversational query processor (Google Gemini 1.5 Flash + offline ML engine) supporting English and Hindi/Hinglish. |
+| `GET` | `/api/ai/predictive-health` | Fleet-wide predictive maintenance health scores, risk categorization, and high-risk equipment alerts. |
+| `POST` | `/api/ai/recommend-asset` | **🎯 Smart ML Recommender**: Hardware compatibility matching based on employee role, department affinity, and device health. |
+| `GET` | `/api/ai/depreciation` | **💰 Financial Valuation**: Double-Declining Balance (DDB) & Straight-Line 3-year depreciation forecaster. |
+| `GET` | `/api/ai/executive-summary` | **📑 AI Executive Briefing**: Synthesizes fleet health index, capital risk, capex replacement alerts, and action recommendations. |
+| `GET` | `/api/ai/config` | Checks whether Google Gemini Flash API is connected and returns masked status. |
+| `POST` | `/api/ai/config` | Saves or updates Google Gemini API key securely in configuration. |
+| `GET` | `/api/allocations` | Returns all active & historic device allocations joined with asset metadata. |
+| `GET` | `/api/email-logs` | Returns recent transactional email dispatch audit logs. |
+| `GET` | `/api/smtp-config` | Returns active SMTP email server configuration (passwords masked). |
+| `POST` | `/api/smtp-config` | Updates custom SMTP server credentials (Gmail, Outlook, AWS SES). |
+| `POST` | `/api/test-email` | Dispatches test transactional email to verify SMTP transporter. |
 
 ---
 
-## 🗃️ Database Schema (`data/db.json`)
+## 🗃️ Enterprise Database Schema (`data/db.json`)
 
 ```json
 {
@@ -147,32 +156,65 @@ flowchart LR
       "status": "Allocated",
       "purchase_date": "2026-01-15",
       "price": 249999,
-      "vendor": "Apple India Store",
+      "vendor": "Apple India Retail (BKC Mumbai)",
       "warranty_expiry": "2029-01-15",
-      "location": "Mumbai HQ",
-      "notes": "64GB RAM, 1TB SSD, Space Black."
+      "location": "Mumbai HQ (BKC)",
+      "health_score": 98,
+      "condition": "Excellent",
+      "notes": "64GB Unified Memory, 1TB NVMe SSD, Space Black."
+    },
+    {
+      "id": 8,
+      "asset_name": "Dell UltraSharp 32\" 4K PremierColor Monitor",
+      "serial_number": "DELL32U202688",
+      "category": "Monitor",
+      "status": "Damaged",
+      "purchase_date": "2026-03-20",
+      "price": 78500,
+      "vendor": "Dell Commercial Direct",
+      "location": "Bengaluru Tech Park (Tower B)",
+      "health_score": 52,
+      "damage_history": [
+        {
+          "id": "INC-1791879595612",
+          "reported_at": "2026-10-13T08:19:55.612Z",
+          "issue_category": "Display / Screen",
+          "severity": "High",
+          "previous_health_score": 85,
+          "new_health_score": 52,
+          "failure_probability": 45,
+          "risk_level": "MODERATE",
+          "reported_by": "Amit Joshi (IT Helpdesk)",
+          "ai_diagnosis": {
+            "fault_mechanism": "High-impact physical shock caused stress cracks across display substrate. Ribbon interconnect or digitizer matrix shows electrical discontinuity.",
+            "estimated_repair_cost": "₹1,500 - ₹3,500 (Inspection) / ₹18,000 (Panel)",
+            "safety_hazard_detected": false
+          }
+        }
+      ]
     }
   ],
   "allocations": [
     {
-      "id": 101,
-      "asset_id": 1,
-      "employee_id": "EMP1001",
-      "employee_name": "Tushar Mahapatra",
-      "employee_email": "tushar@example.com",
-      "employee_phone": "+918530079618",
-      "employee_department": "Engineering",
-      "allocated_date": "2026-10-09T00:00:00.000Z"
+      "id": 104,
+      "asset_id": 5,
+      "employee_id": "IND-EMP-1021",
+      "employee_name": "Aarav Sharma",
+      "employee_email": "aarav.sharma@techcorp.in",
+      "employee_phone": "+91 98201 45230",
+      "employee_department": "Software Engineering",
+      "allocated_date": "2026-10-05T00:00:00.000Z"
     }
   ],
   "email_logs": [
     {
-      "id": 501,
-      "to": "tushar@example.com",
-      "subject": "Hardware Asset Allocation Confirmation",
-      "asset_name": "MacBook Pro 16\" M3 Max",
-      "sent_at": "2026-10-09T06:00:00.000Z",
-      "status": "Delivered"
+      "id": 304,
+      "asset_id": 5,
+      "employee_name": "Aarav Sharma",
+      "employee_email": "aarav.sharma@techcorp.in",
+      "subject": "IT Asset Allocated: Lenovo ThinkPad T14 Gen 4 (LNVT14G4202605)",
+      "status": "Sent (Real Email Delivered)",
+      "sent_at": "2026-10-05T10:14:00.000Z"
     }
   ]
 }
@@ -180,15 +222,38 @@ flowchart LR
 
 ---
 
+## 🇮🇳 Real Indian Enterprise Employee & Hardware Fleet
+
+The database is pre-populated with realistic, enterprise-grade records representing modern Indian technology hubs:
+
+| Employee Name | Employee ID | Department | Assigned Equipment | Location |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tushar Mahapatra** | `IND-EMP-1001` | Computer Engineering | **Lenovo ThinkPad X1 Carbon Gen 11** + **Dell UltraSharp 27" 4K** | Bengaluru Tech Park |
+| **Jitendra Prasad Mahapatra** | `IND-EMP-1002` | Production Operations | **Apple MacBook Pro 16" M3 Max** (64GB RAM) | Mumbai HQ (BKC) |
+| **Aarav Sharma** | `IND-EMP-1021` | Software Engineering | **Lenovo ThinkPad T14 Gen 4** + **Logitech MX Master 3S** | Pune Cybercity |
+| **Priya Patel** | `IND-EMP-1045` | Product Design | **LG UltraFine 27" 5K Display** | Ahmedabad Studio |
+| **Vikram Malhotra** | `IND-EMP-1082` | DevOps & Cloud | **Dell Latitude 7440 Ultra** + **Keychron Q1 Pro** | Hyderabad HITEC City |
+| **Ananya Iyer** | `IND-EMP-1103` | Data Science & AI | **Apple MacBook Pro 14" M3 Pro** + **NVIDIA Jetson Orin Nano** | Bengaluru Tech Park |
+| **Rohit Verma** | `IND-EMP-1124` | Cyber Security | **Samsung Galaxy S24 Ultra 512GB** | Delhi Cyber Hub |
+| **Sneha Kulkarni** | `IND-EMP-1148` | Product Management | **HP EliteBook 840 G10** (Ryzen 7 PRO) | Pune Cybercity |
+| **Aditya Nair** | `IND-EMP-1165` | Quality Assurance | **Jabra Evolve2 85 Wireless Headset** | Kochi Infopark |
+| **Pooja Deshmukh** | `IND-EMP-1189` | Human Resources | **Apple iPhone 15 Pro Max 512GB** | Bengaluru Tech Park |
+| **Rajesh Singhania** | `IND-EMP-1210` | Finance & Accounts | **Cisco Catalyst 1000 24-Port Switch Rack** | Mumbai HQ (BKC) |
+| **Neha Reddy** | `IND-EMP-1235` | Mobile Development | **Asus ROG Zephyrus G16** (RTX 4080 OLED) | Hyderabad HITEC City |
+
+---
+
 ## 🛠️ Tech Stack & Technologies
 
-- **Frontend**: HTML5, Modern Responsive CSS3 (Glassmorphic cards, Flexbox/Grid, CSS Variables), FontAwesome / SVG Icons.
+- **Frontend**: HTML5, Modern Vanilla CSS3 (Glassmorphism, CSS Custom Properties, Dual Dark/Light Themes), Outfit & Inter Fonts.
 - **Analytics & Data Vis**: **Chart.js v4** (Custom Center Metric Plugins, Canvas Gradients, Responsive Aspect Ratios).
+- **Reporting & Export**: **jsPDF & AutoTable** (Landscape PDF report generator) + CSV export engine.
 - **Client-Side AI**: **Tesseract.js** (Optical Character Recognition for hardware invoice scanning).
 - **Backend Server**: **Node.js (v18+)** with **Express.js v4**.
-- **Email Delivery**: **Nodemailer** with Ethereal auto-test fallback & custom SMTP modal support.
+- **AI / ML Suite**: **Google Gemini 1.5 Flash Cloud LLM** + **Built-in Offline Deep Neural Rules & NLP Engine**.
+- **Email Delivery**: **Nodemailer** with dual HTML/plain text templates and custom SMTP settings.
 - **Data Persistence**: Atomic JSON File Store (`data/db.json`) with serverless `/tmp` fallback for Vercel.
-- **Cloud Deployment**: **Vercel** serverless functions ready (`vercel.json` pre-configured).
+- **Cloud Deployment**: **Vercel** serverless functions (`vercel.json` pre-configured).
 
 ---
 
@@ -230,12 +295,20 @@ This repository includes a pre-configured `vercel.json` file for 1-click Serverl
 
 ---
 
-## 🔮 Roadmap & Future Enhancements
+## 🔮 Roadmap & Features Status
 
-- [ ] 📄 **PDF Handover Receipt Generation**: 1-click downloadable signed PDF receipts for physical device distribution.
-- [ ] 🏷️ **Dynamic QR Code & Barcode Generator**: Print physical hardware labels directly from asset cards.
+- [x] 🤖 **AssetBot AI Natural Language Assistant (Hybrid Cloud / Offline)**
+- [x] 🔮 **Predictive Fleet Maintenance & RUL Machine Learning Engine**
+- [x] 🚨 **Hardware Damage Reporting & AI Health Diagnostics**
+- [x] 🎯 **Smart ML Employee Hardware Allocation Recommender**
+- [x] 💰 **Financial Depreciation & Fleet Resale Forecaster (DDB / SL)**
+- [x] 📑 **AI Executive Briefing Generator & Clipboard Synthesizer**
+- [x] 📄 **Enterprise PDF Handover & Inventory Report Generation (jsPDF)**
+- [x] 📊 **One-Click CSV Export for Compliance Audits**
+- [x] 📷 **AI Invoice OCR Specs Scanner (Tesseract.js)**
+- [x] 📧 **Primary Inbox HTML Email Engine with Custom SMTP Setup**
+- [ ] 🏷️ **Dynamic QR Code & Barcode Generator for Hardware Labels**
 - [ ] 🔒 **Role-Based Access Control (RBAC)**: JWT authentication for Admin, Auditor, and Employee roles.
-- [ ] 📊 **CSV / Excel Export**: One-click inventory reporting for compliance audits.
 
 ---
 
