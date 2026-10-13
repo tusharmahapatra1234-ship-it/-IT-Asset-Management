@@ -69,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp();
     setupEventListeners();
     initOcrScanner();
+    initAiChatbot();
+    initGeminiConfig();
+    initAiRecommender();
+    checkAiConfigStatus();
+    initDamageReporting();
 });
 
 function initTheme() {
@@ -518,8 +523,8 @@ function renderAssetsTable(assets) {
                 <button class="btn btn-success btn-xs" onclick="openAllocateModal(${asset.id}, '${escapeHtml(asset.asset_name)}', '${escapeHtml(asset.serial_number)}', '${escapeHtml(asset.category)}')">
                     <span>⚡</span> Allocate
                 </button>
-                <button class="btn btn-secondary btn-xs" onclick="updateAssetStatus(${asset.id}, 'Damaged')">
-                    <span>⚠️</span> Damaged
+                <button class="btn btn-warning btn-xs" onclick="openDamageReportModal(${asset.id})" title="Report Damage & Run AI Health Diagnostics">
+                    <span>🚨</span> Damage
                 </button>
             `;
         } else if (asset.status === 'Allocated') {
@@ -527,16 +532,25 @@ function renderAssetsTable(assets) {
                 <button class="btn btn-secondary btn-xs" onclick="deallocateAsset(${asset.id})">
                     <span>🔄</span> Return
                 </button>
+                <button class="btn btn-warning btn-xs" onclick="openDamageReportModal(${asset.id})" title="Report Damage & Run AI Health Diagnostics">
+                    <span>🚨</span> Damage
+                </button>
             `;
         } else if (asset.status === 'Damaged') {
             actionBtnsHtml = `
                 <button class="btn btn-success btn-xs" onclick="updateAssetStatus(${asset.id}, 'Available')">
                     <span>🛠️</span> Repaired
                 </button>
+                <button class="btn btn-warning btn-xs" onclick="openDamageReportModal(${asset.id})" title="Add Incident / Re-diagnose">
+                    <span>🚨</span> Damage
+                </button>
             `;
         }
 
         actionBtnsHtml += `
+            <button class="btn btn-secondary btn-xs" onclick="openAssetDiagnostics(${asset.id})" title="🔬 AI Diagnostics">
+                <span>🔬</span>
+            </button>
             <button class="btn btn-danger btn-xs" onclick="deleteAsset(${asset.id})" title="Delete Asset">
                 <span>🗑️</span>
             </button>
@@ -598,6 +612,19 @@ function renderAssetsTable(assets) {
                     <span class="status-dot"></span>
                     <span>${escapeHtml(asset.status)}</span>
                 </span>
+            </td>
+            <td>
+                <div class="health-score-cell">
+                    <span class="health-score-pill ${(asset.health && asset.health.risk_badge_class) || 'green'}" onclick="openAssetDiagnostics(${asset.id})" title="Click to view AI Diagnostics">
+                        ${(asset.health && asset.health.risk_level === 'CRITICAL') ? '🔴' : (asset.health && asset.health.risk_level === 'MODERATE') ? '🟡' : '🟢'} ${(asset.health && asset.health.health_score) || 90}%
+                    </span>
+                    <div class="health-bar-container">
+                        <div class="health-bar-fill ${(asset.health && asset.health.risk_badge_class) || 'green'}" style="width: ${(asset.health && asset.health.health_score) || 90}%"></div>
+                    </div>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">
+                    Risk: <strong style="color: ${(asset.health && asset.health.risk_level === 'CRITICAL') ? 'var(--accent-red)' : (asset.health && asset.health.risk_level === 'MODERATE') ? 'var(--accent-yellow)' : 'var(--accent-emerald)'}">${(asset.health && asset.health.risk_level) || 'LOW'}</strong>
+                </div>
             </td>
             <td>
                 <div class="asset-price-tag">${formattedPrice}</div>
@@ -991,14 +1018,22 @@ window.switchToView = function(viewName) {
     const dashboardSec = document.getElementById('dashboardViewSection');
     const allocationsSec = document.getElementById('allocationsViewSection');
     const emailLogsSec = document.getElementById('emailLogsViewSection');
+    const aiHubSec = document.getElementById('aiHubViewSection');
 
     if (dashboardSec) dashboardSec.style.display = 'none';
     if (allocationsSec) allocationsSec.style.display = 'none';
     if (emailLogsSec) emailLogsSec.style.display = 'none';
+    if (aiHubSec) aiHubSec.style.display = 'none';
 
     document.querySelectorAll('.nav-menu .nav-item').forEach(item => item.classList.remove('active'));
 
-    if (viewName === 'allocations') {
+    if (viewName === 'ai-hub') {
+        if (aiHubSec) aiHubSec.style.display = 'block';
+        const navAi = document.getElementById('navAiHubView');
+        if (navAi) navAi.classList.add('active');
+
+        loadAiIntelligenceHub();
+    } else if (viewName === 'allocations') {
         if (allocationsSec) allocationsSec.style.display = 'block';
         const navAlloc = document.getElementById('navAllocationsView');
         if (navAlloc) navAlloc.classList.add('active');
@@ -1075,6 +1110,42 @@ function setupEventListeners() {
         navEmailLogs.addEventListener('click', (e) => {
             e.preventDefault();
             switchToView('email-logs');
+        });
+    }
+
+    const navAiHub = document.getElementById('navAiHubView');
+    if (navAiHub) {
+        navAiHub.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchToView('ai-hub');
+        });
+    }
+
+    const btnRefreshAi = document.getElementById('btnRunMlScan');
+    if (btnRefreshAi) {
+        btnRefreshAi.addEventListener('click', () => {
+            loadAiIntelligenceHub();
+            showToast('⚡ Live ML Diagnostics refreshed across fleet!', 'success');
+        });
+    }
+
+    const btnCopyBriefing = document.getElementById('btnCopyBriefingText');
+    if (btnCopyBriefing) {
+        btnCopyBriefing.addEventListener('click', () => {
+            if (cachedBriefingText) {
+                navigator.clipboard.writeText(cachedBriefingText).then(() => {
+                    showToast('📋 Executive Briefing copied to clipboard!', 'success');
+                }).catch(() => {
+                    showToast('Could not access clipboard', 'error');
+                });
+            }
+        });
+    }
+
+    const btnExportBriefing = document.getElementById('btnExportExecutiveBriefing');
+    if (btnExportBriefing) {
+        btnExportBriefing.addEventListener('click', () => {
+            if (btnCopyBriefing) btnCopyBriefing.click();
         });
     }
 
@@ -1585,3 +1656,1016 @@ window.openSmtpConfigFromAlloc = function() {
     const btn = document.getElementById('openSmtpModalBtn');
     if (btn) btn.click();
 };
+
+// ====================================================
+// AI & MACHINE LEARNING INTELLIGENCE MODULE
+// ====================================================
+
+let aiFleetPredictiveState = null;
+let aiDepreciationState = null;
+let aiChatHistoryState = [];
+let aiRiskFilter = 'all';
+let aiDepreciationChartInstance = null;
+let aiValuationForecastChartInstance = null;
+let aiIsGeminiActive = false;
+
+// 1. Check AI Config Status
+async function checkAiConfigStatus() {
+    try {
+        const config = await safeFetchJson(`${API_BASE}/ai/config`);
+        aiIsGeminiActive = Boolean(config.has_key);
+        updateAiBadges(aiIsGeminiActive);
+    } catch (err) {
+        console.warn('Could not check AI config status:', err);
+        updateAiBadges(false);
+    }
+}
+
+function updateAiBadges(isGemini) {
+    const chip = document.getElementById('navAiStatusChip');
+    const indicator = document.getElementById('aiHubStatusIndicator');
+    const chatStatus = document.getElementById('aiChatOnlineStatus');
+
+    if (chip) {
+        chip.innerText = isGemini ? 'Gemini ⚡' : 'ML Ready';
+        chip.style.borderColor = isGemini ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.3)';
+        chip.style.color = isGemini ? '#60a5fa' : '#10b981';
+    }
+
+    if (indicator) {
+        indicator.innerText = isGemini ? '✨ Gemini Flash Connected' : '⚡ Built-in ML Active';
+        indicator.className = `badge-pill ${isGemini ? 'blue' : 'green'}`;
+    }
+
+    if (chatStatus) {
+        chatStatus.innerText = isGemini ? '● Gemini Flash Live' : '● Built-in ML Mode';
+        chatStatus.style.color = isGemini ? '#60a5fa' : '#34d399';
+    }
+}
+
+// 2. Load Main AI Intelligence Hub
+async function loadAiIntelligenceHub() {
+    initAiHubTabs();
+
+    try {
+        // Fetch Predictive Health & Depreciation in parallel
+        const [healthData, deprData] = await Promise.all([
+            safeFetchJson(`${API_BASE}/ai/predictive-health`),
+            safeFetchJson(`${API_BASE}/ai/depreciation`)
+        ]);
+
+        aiFleetPredictiveState = healthData;
+        aiDepreciationState = deprData;
+
+        // Populate KPIs
+        const healthAvgEl = document.getElementById('aiKpiHealthAvg');
+        const healthStatusEl = document.getElementById('aiKpiHealthStatus');
+        const failureRiskEl = document.getElementById('aiKpiFailureRisk');
+        const failureSubEl = document.getElementById('aiKpiFailureSub');
+        const bookValueEl = document.getElementById('aiKpiBookValue');
+        const deprSubEl = document.getElementById('aiKpiDeprSub');
+        const replacementDueEl = document.getElementById('aiKpiReplacementDue');
+        const replacementSubEl = document.getElementById('aiKpiReplacementSub');
+
+        if (healthAvgEl) healthAvgEl.innerText = `${healthData.fleet_health_average}%`;
+        if (healthStatusEl) {
+            healthStatusEl.innerText = healthData.fleet_health_average >= 80 
+                ? '🟢 Operational Stability' 
+                : healthData.fleet_health_average >= 60 
+                ? '🟡 Moderate Wear Detected' 
+                : '🔴 Elevated Failure Risk';
+        }
+
+        if (failureRiskEl) failureRiskEl.innerText = `${healthData.critical_count + healthData.moderate_count}`;
+        if (failureSubEl) failureSubEl.innerText = `${healthData.critical_count} Critical / ${healthData.moderate_count} Moderate`;
+
+        if (bookValueEl) bookValueEl.innerText = `₹${(deprData.total_current_book_value || 0).toLocaleString('en-IN')}`;
+        if (deprSubEl) deprSubEl.innerText = `${deprData.fleet_depreciation_pct}% fleet depreciation`;
+
+        if (replacementDueEl) replacementDueEl.innerText = `${deprData.replacement_due_count || 0} Units`;
+        if (replacementSubEl) replacementSubEl.innerText = `Capex planning required this FY`;
+
+        // Update counts in Risk filter buttons
+        const countAll = document.getElementById('countRiskAll');
+        const countCrit = document.getElementById('countRiskCritical');
+        const countMod = document.getElementById('countRiskModerate');
+        const countHealthy = document.getElementById('countRiskHealthy');
+        if (countAll) countAll.innerText = healthData.all_scored_assets.length;
+        if (countCrit) countCrit.innerText = healthData.critical_count;
+        if (countMod) countMod.innerText = healthData.moderate_count;
+        if (countHealthy) countHealthy.innerText = healthData.healthy_count;
+
+        // Render Tab 1 Table
+        renderAiPredictiveTable(healthData.all_scored_assets, aiRiskFilter);
+
+        // Render Tab 3 Depreciation
+        renderAiDepreciationCharts(deprData);
+        renderAiReplacementWatchlist(deprData.replacement_due_assets || []);
+
+        // Load Executive Briefing in background
+        loadAiExecutiveBriefing();
+
+    } catch (err) {
+        console.error('Failed to load AI Hub data:', err);
+        showToast('Error loading AI predictive analytics: ' + err.message, 'error');
+    }
+}
+
+// 3. Render Tab 1: Predictive Risk Matrix Table
+function renderAiPredictiveTable(scoredAssets, filter = 'all') {
+    const tbody = document.getElementById('aiPredictiveTableBody');
+    const badge = document.getElementById('aiScoredCountBadge');
+    if (!tbody) return;
+
+    let filtered = scoredAssets || [];
+    if (filter === 'critical') filtered = filtered.filter(a => a.risk_level === 'CRITICAL');
+    else if (filter === 'moderate') filtered = filtered.filter(a => a.risk_level === 'MODERATE');
+    else if (filter === 'healthy') filtered = filtered.filter(a => a.risk_level === 'LOW');
+
+    if (badge) badge.innerText = `${filtered.length} assets shown`;
+
+    tbody.innerHTML = '';
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">No assets matching the "${filter}" risk level.</td></tr>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <strong>${escapeHtml(item.asset_name)}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">
+                    SN: <code>${escapeHtml(item.serial_number)}</code>
+                </div>
+            </td>
+            <td>
+                <span class="category-pill-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem;">${escapeHtml(item.category)}</span>
+                <span class="status-badge ${item.status.toLowerCase()}" style="font-size: 0.68rem; margin-left: 0.3rem;">${escapeHtml(item.status)}</span>
+            </td>
+            <td>
+                <div class="health-score-cell">
+                    <span class="health-score-pill ${item.risk_badge_class}" onclick="openAssetDiagnostics(${item.asset_id})">
+                        ${item.health_score}%
+                    </span>
+                    <div class="health-bar-container">
+                        <div class="health-bar-fill ${item.risk_badge_class}" style="width: ${item.health_score}%"></div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="badge-pill ${item.risk_badge_class}" style="font-size: 0.75rem; font-weight: 700;">
+                    ${item.risk_level === 'CRITICAL' ? '🔴' : item.risk_level === 'MODERATE' ? '🟡' : '🟢'} ${item.risk_level}
+                </span>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">
+                    ${item.failure_pct}% failure prob
+                </div>
+            </td>
+            <td>
+                <strong>${item.remaining_useful_life_months} months</strong>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">EOL: ${item.predicted_failure_date}</div>
+            </td>
+            <td style="max-width: 250px;">
+                <span style="font-size: 0.8rem; color: var(--text-main); line-height: 1.4;">${escapeHtml(item.recommended_action)}</span>
+            </td>
+            <td>
+                <button class="btn btn-secondary btn-xs" onclick="openAssetDiagnostics(${item.asset_id})">
+                    <span>🔬</span> Diagnostics
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// 4. Open Single Asset AI Diagnostics Modal
+window.openAssetDiagnostics = async function(assetId) {
+    const modal = document.getElementById('aiDiagnosticsModal');
+    if (!modal) return;
+
+    try {
+        const data = await safeFetchJson(`${API_BASE}/assets/${assetId}/diagnostics`);
+        const { asset, diagnostics } = data;
+
+        document.getElementById('diagModalTitle').innerText = `AI Diagnostics: ${asset.asset_name}`;
+        document.getElementById('diagAssetName').innerText = asset.asset_name;
+        document.getElementById('diagSerial').innerText = `SN: ${asset.serial_number} | Category: ${asset.category} | Status: ${asset.status}`;
+
+        const pill = document.getElementById('diagHealthPill');
+        pill.innerText = `${diagnostics.health_score}% Health`;
+        pill.className = `badge-pill ${diagnostics.risk_badge_class}`;
+
+        document.getElementById('diagRiskLabel').innerText = `Failure Risk: ${diagnostics.risk_level}`;
+        document.getElementById('diagFailPct').innerText = `${diagnostics.failure_pct}%`;
+        document.getElementById('diagRulMonths').innerText = `${diagnostics.remaining_useful_life_months} mo`;
+        document.getElementById('diagFailureDate').innerText = diagnostics.predicted_failure_date;
+
+        const factorsList = document.getElementById('diagRiskFactorsList');
+        factorsList.innerHTML = '';
+        (diagnostics.risk_factors || []).forEach(f => {
+            const li = document.createElement('li');
+            li.innerText = f;
+            factorsList.appendChild(li);
+        });
+
+        document.getElementById('diagRecommendedAction').innerText = diagnostics.recommended_action;
+
+        // Wire up Damage Report Button in Diagnostics modal
+        const btnDiagReportDamage = document.getElementById('btnDiagReportDamage');
+        if (btnDiagReportDamage) {
+            btnDiagReportDamage.onclick = () => {
+                closeModal(modal);
+                openDamageReportModal(asset.id);
+            };
+        }
+
+        // Render Logged Damage Incidents if any
+        const damageContainer = document.getElementById('diagDamageHistoryContainer');
+        const damageList = document.getElementById('diagDamageHistoryList');
+        if (damageContainer && damageList) {
+            if (asset.damage_history && asset.damage_history.length > 0) {
+                damageContainer.style.display = 'block';
+                damageList.innerHTML = '';
+                asset.damage_history.forEach(inc => {
+                    const card = document.createElement('div');
+                    card.className = 'damage-incident-card';
+                    const diag = inc.ai_diagnosis || {};
+                    const incDate = inc.reported_at ? new Date(inc.reported_at).toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                    card.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; font-size: 0.78rem;">
+                            <div>
+                                <span style="font-weight: 700; color: #ef4444;">🚨 ${escapeHtml(inc.category || 'Hardware Defect')}</span>
+                                <span class="badge-pill ${inc.severity === 'Critical' ? 'red' : inc.severity === 'High' ? 'orange' : 'yellow'}" style="margin-left: 0.35rem; font-size: 0.7rem; padding: 0.15rem 0.45rem;">${escapeHtml(inc.severity)}</span>
+                            </div>
+                            <span style="color: var(--text-muted); font-size: 0.72rem;">${incDate}</span>
+                        </div>
+                        <p style="margin: 0.2rem 0 0.4rem; font-size: 0.8rem; color: var(--text-main); font-style: italic;">
+                            "${escapeHtml(inc.description || '')}"
+                        </p>
+                        <div style="font-size: 0.76rem; background: rgba(0,0,0,0.25); border-radius: 6px; padding: 0.45rem 0.65rem; border-left: 3px solid #ef4444;">
+                            <div style="font-weight: 700; color: var(--accent-yellow);">AI Diagnosis: ${escapeHtml(diag.fault_mechanism || 'Hardware fault analyzed')}</div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; color: var(--text-muted); font-size: 0.72rem;">
+                                <span>Health: <strong style="color: #ef4444;">${inc.new_health_score ?? diag.calculated_health_score ?? '--'}%</strong> (drop from ${inc.previous_health_score ?? '--'}%)</span>
+                                <span>Est. Repair: <strong style="color: var(--accent-green);">${diag.estimated_repair_cost || 'N/A'}</strong></span>
+                            </div>
+                        </div>
+                    `;
+                    damageList.appendChild(card);
+                });
+            } else {
+                damageContainer.style.display = 'none';
+                damageList.innerHTML = '';
+            }
+        }
+
+        openModal(modal);
+    } catch (err) {
+        showToast('Failed to load diagnostics: ' + err.message, 'error');
+    }
+};
+
+// 5. Initialize Sub-Tabs in AI Hub
+function initAiHubTabs() {
+    const tabBtns = document.querySelectorAll('.ai-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.onclick = () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const tab = btn.getAttribute('data-tab');
+            document.getElementById('aiTabPredictiveHealth').style.display = tab === 'predictive-health' ? 'block' : 'none';
+            document.getElementById('aiTabSmartRecommender').style.display = tab === 'smart-recommender' ? 'block' : 'none';
+            document.getElementById('aiTabDepreciation').style.display = tab === 'depreciation-forecast' ? 'block' : 'none';
+            document.getElementById('aiTabExecutiveBriefing').style.display = tab === 'executive-briefing' ? 'block' : 'none';
+
+            if (tab === 'depreciation-forecast' && aiDepreciationState) {
+                setTimeout(() => renderAiDepreciationCharts(aiDepreciationState), 50);
+            }
+        };
+    });
+
+    // Risk Filters
+    const riskBtns = [
+        { id: 'filterRiskAll', filter: 'all' },
+        { id: 'filterRiskCritical', filter: 'critical' },
+        { id: 'filterRiskModerate', filter: 'moderate' },
+        { id: 'filterRiskHealthy', filter: 'healthy' }
+    ];
+
+    riskBtns.forEach(({ id, filter }) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.onclick = () => {
+                riskBtns.forEach(b => document.getElementById(b.id)?.classList.remove('active-filter'));
+                btn.classList.add('active-filter');
+                aiRiskFilter = filter;
+                if (aiFleetPredictiveState) {
+                    renderAiPredictiveTable(aiFleetPredictiveState.all_scored_assets, filter);
+                }
+            };
+        }
+    });
+}
+
+// 6. Smart ML Allocation Recommender
+function initAiRecommender() {
+    const form = document.getElementById('aiRecommenderForm');
+    if (!form) return;
+
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const dept = document.getElementById('aiRecDept').value;
+        const role = document.getElementById('aiRecRole').value;
+        const empName = document.getElementById('aiRecEmpName').value;
+
+        const resultsGrid = document.getElementById('aiRecommenderResultsGrid');
+        const resultBadge = document.getElementById('aiRecResultBadge');
+        if (resultsGrid) resultsGrid.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted);">🤖 AI computing compatibility scores...</div>';
+
+        try {
+            const data = await safeFetchJson(`${API_BASE}/ai/recommend-asset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ department: dept, role, employee_name: empName })
+            });
+
+            if (resultBadge) resultBadge.innerText = `${data.recommended.length} Matches Found`;
+
+            if (data.recommended.length === 0) {
+                resultsGrid.innerHTML = `
+                    <div style="padding: 2rem; text-align: center; color: var(--text-muted); grid-column: 1 / -1;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📦</div>
+                        <h3>No Available Assets Found</h3>
+                        <p>${data.message || 'All hardware assets are currently allocated or damaged.'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            resultsGrid.innerHTML = '';
+            data.recommended.forEach((rec) => {
+                const card = document.createElement('div');
+                card.className = 'ai-rec-card';
+                card.innerHTML = `
+                    <div>
+                        <div class="ai-rec-header">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1rem; color: var(--text-main);">${escapeHtml(rec.asset_name)}</h3>
+                                <span style="font-size: 0.78rem; color: var(--text-muted);">SN: <code>${escapeHtml(rec.serial_number)}</code> | ${escapeHtml(rec.category)}</span>
+                            </div>
+                            <span class="ai-match-badge">${rec.match_score}% Match</span>
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem; margin: 0.6rem 0; font-size: 0.78rem;">
+                            <span class="badge-pill green">Health: ${rec.health_score}%</span>
+                            <span class="badge-pill blue">₹${parseFloat(rec.price).toLocaleString('en-IN')}</span>
+                            <span class="badge-pill" style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted);">📍 ${escapeHtml(rec.location)}</span>
+                        </div>
+
+                        <ul class="ai-rec-reasons">
+                            ${rec.reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+                        <button class="btn btn-success btn-xs" style="width: 100%;" onclick="quickAllocateRecommended(${rec.asset_id}, '${escapeHtml(rec.asset_name)}', '${escapeHtml(rec.serial_number)}', '${escapeHtml(rec.category)}', '${escapeHtml(empName)}', '${escapeHtml(dept)}')">
+                            ⚡ Allocate This Asset
+                        </button>
+                    </div>
+                `;
+                resultsGrid.appendChild(card);
+            });
+        } catch (err) {
+            showToast('Recommender error: ' + err.message, 'error');
+        }
+    };
+}
+
+window.quickAllocateRecommended = function(id, name, serial, category, empName, dept) {
+    switchToView('dashboard');
+    openAllocateModal(id, name, serial, category);
+    if (empName) document.getElementById('employee_name').value = empName;
+    if (dept) document.getElementById('employee_department').value = dept;
+};
+
+// 7. Render AI Depreciation Charts & Watchlist
+function renderAiDepreciationCharts(deprData) {
+    if (!deprData) return;
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light';
+    const textColor = isLightMode ? '#334155' : '#e2e8f0';
+    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
+
+    // Chart 1: Initial Cost vs Current Book Value by Category
+    const catKeys = Object.keys(deprData.category_breakdown || {});
+    const initialVals = catKeys.map(k => Math.round(deprData.category_breakdown[k].initialCost));
+    const currentVals = catKeys.map(k => Math.round(deprData.category_breakdown[k].currentBookValue));
+
+    const deprCtx = document.getElementById('aiDepreciationChart')?.getContext('2d');
+    if (deprCtx) {
+        if (aiDepreciationChartInstance) aiDepreciationChartInstance.destroy();
+        aiDepreciationChartInstance = new Chart(deprCtx, {
+            type: 'bar',
+            data: {
+                labels: catKeys,
+                datasets: [
+                    {
+                        label: 'Initial Cost',
+                        data: initialVals,
+                        backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Current Book Value',
+                        data: currentVals,
+                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: textColor, font: { size: 11, weight: '600' } } }
+                },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { display: false } },
+                    y: {
+                        ticks: { color: textColor, callback: v => '₹' + (v >= 1000 ? (v / 1000) + 'k' : v) },
+                        grid: { color: gridColor }
+                    }
+                }
+            }
+        });
+    }
+
+    // Chart 2: 3-Year Future Valuation Forecast
+    const forecastCtx = document.getElementById('aiValuationForecastChart')?.getContext('2d');
+    if (forecastCtx) {
+        if (aiValuationForecastChartInstance) aiValuationForecastChartInstance.destroy();
+        aiValuationForecastChartInstance = new Chart(forecastCtx, {
+            type: 'line',
+            data: {
+                labels: ['Current Value', '+1 Year', '+2 Years', '+3 Years'],
+                datasets: [{
+                    label: 'Fleet Residual Valuation',
+                    data: [
+                        deprData.total_current_book_value,
+                        deprData.forecast_fleet_1yr,
+                        deprData.forecast_fleet_2yr,
+                        Math.round(deprData.total_initial_cost * 0.1) // Salvage baseline
+                    ],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#f59e0b',
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: textColor, font: { size: 11, weight: '600' } } }
+                },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { display: false } },
+                    y: {
+                        ticks: { color: textColor, callback: v => '₹' + (v >= 1000 ? (v / 1000) + 'k' : v) },
+                        grid: { color: gridColor }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function renderAiReplacementWatchlist(replacementAssets) {
+    const tbody = document.getElementById('aiReplacementTableBody');
+    const badge = document.getElementById('aiReplacementCountBadge');
+    if (!tbody) return;
+
+    if (badge) badge.innerText = `${replacementAssets.length} items`;
+    tbody.innerHTML = '';
+
+    if (replacementAssets.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">🎉 All devices are operating within standard depreciation lifecycle limits.</td></tr>`;
+        return;
+    }
+
+    replacementAssets.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${escapeHtml(a.asset_name)}</strong></td>
+            <td><span class="category-pill-badge" style="font-size: 0.72rem;">${escapeHtml(a.category)}</span></td>
+            <td>₹${parseFloat(a.purchaseCost).toLocaleString('en-IN')}</td>
+            <td>₹${parseFloat(a.currentBookValue).toLocaleString('en-IN')}</td>
+            <td>${a.ageYears} yrs in service</td>
+            <td>
+                <span class="badge-pill red" style="font-weight: 700; font-size: 0.75rem;">
+                    ⚠️ Capex Replacement Due (${a.expectedLifeYears}y rated)
+                </span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// 8. AI Executive Briefing Loader
+let cachedBriefingText = '';
+async function loadAiExecutiveBriefing() {
+    const container = document.getElementById('aiExecutiveBriefingContent');
+    if (!container) return;
+
+    try {
+        const briefing = await safeFetchJson(`${API_BASE}/ai/executive-summary`);
+        
+        let html = `
+            <div style="background: rgba(37, 99, 235, 0.08); border-left: 4px solid #3b82f6; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0 0 0.4rem; color: #3b82f6; font-size: 1.05rem;">🎯 Executive Overview</h3>
+                <p style="margin: 0; font-weight: 500; font-size: 0.95rem; color: var(--text-main);">${escapeHtml(briefing.executive_takeaway)}</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="diag-metric-box">
+                    <span class="diag-label">Fleet Health Index</span>
+                    <h3 style="margin: 0.2rem 0 0; color: #10b981;">${briefing.overview.fleet_health_score}%</h3>
+                </div>
+                <div class="diag-metric-box">
+                    <span class="diag-label">Active Utilization</span>
+                    <h3 style="margin: 0.2rem 0 0; color: #3b82f6;">${briefing.overview.active_utilization_rate}</h3>
+                </div>
+                <div class="diag-metric-box">
+                    <span class="diag-label">Current Book Value</span>
+                    <h3 style="margin: 0.2rem 0 0; color: var(--text-main);">${briefing.overview.current_fleet_book_value}</h3>
+                </div>
+                <div class="diag-metric-box">
+                    <span class="diag-label">Initial Procurement</span>
+                    <h3 style="margin: 0.2rem 0 0; color: var(--text-muted);">${briefing.overview.initial_procurement_cost}</h3>
+                </div>
+            </div>
+
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-main);">⚡ Strategic IT Recommendations</h3>
+            <ul style="padding-left: 1.25rem; line-height: 1.8; color: var(--text-main); margin-bottom: 1rem;">
+                ${briefing.strategic_recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+            </ul>
+
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-align: right; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                Generated automatically by IT Asset Manager AI Engine • ${new Date(briefing.timestamp).toLocaleString()}
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        cachedBriefingText = `IT INFRASTRUCTURE EXECUTIVE HEALTH BRIEFING\nGenerated: ${new Date(briefing.timestamp).toLocaleString()}\n\nOVERVIEW:\n${briefing.executive_takeaway}\n\nMETRICS:\n• Health Score: ${briefing.overview.fleet_health_score}%\n• Utilization: ${briefing.overview.active_utilization_rate}\n• Current Book Value: ${briefing.overview.current_fleet_book_value}\n• Initial Cost: ${briefing.overview.initial_procurement_cost}\n\nRECOMMENDATIONS:\n${briefing.strategic_recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n')}`;
+
+    } catch (err) {
+        container.innerHTML = `<div style="color: var(--accent-red);">Failed to compile briefing: ${err.message}</div>`;
+    }
+}
+
+// 9. Floating AI Assistant Chatbot
+function initAiChatbot() {
+    const toggleBtn = document.getElementById('aiChatToggleBtn');
+    const windowEl = document.getElementById('aiChatWindow');
+    const closeBtn = document.getElementById('aiChatCloseBtn');
+    const clearBtn = document.getElementById('aiChatClearBtn');
+    const configBtn = document.getElementById('aiChatConfigBtn');
+    const form = document.getElementById('aiChatForm');
+    const input = document.getElementById('aiChatInput');
+    const messagesEl = document.getElementById('aiChatMessages');
+    const indicator = document.getElementById('aiChatTypingIndicator');
+
+    if (!toggleBtn || !windowEl) return;
+
+    toggleBtn.onclick = () => {
+        const isHidden = windowEl.style.display === 'none' || !windowEl.style.display;
+        windowEl.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden && input) input.focus();
+    };
+
+    if (closeBtn) closeBtn.onclick = () => { windowEl.style.display = 'none'; };
+
+    if (clearBtn) clearBtn.onclick = () => {
+        aiChatHistoryState = [];
+        if (messagesEl) {
+            messagesEl.innerHTML = `
+                <div class="ai-msg ai-msg-bot">
+                    <div class="ai-msg-bubble">
+                        👋 <strong>Conversation cleared.</strong> Aap mujhse hardware inventory, health scores, ya allocations ke baare me sawaal pooch sakte hain!
+                    </div>
+                </div>
+            `;
+        }
+    };
+
+    if (configBtn) configBtn.onclick = () => {
+        openModal(document.getElementById('geminiConfigModal'));
+    };
+
+    // Quick Prompt Chips
+    document.querySelectorAll('.ai-chip-btn').forEach(btn => {
+        btn.onclick = () => {
+            const query = btn.getAttribute('data-query');
+            if (query && input) {
+                input.value = query;
+                form.dispatchEvent(new Event('submit'));
+            }
+        };
+    });
+
+    // Form Submit
+    if (form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const text = (input.value || '').trim();
+            if (!text) return;
+
+            // Render User Bubble
+            appendChatMessage(text, 'user');
+            input.value = '';
+            if (indicator) indicator.style.display = 'flex';
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            try {
+                const res = await safeFetchJson(`${API_BASE}/ai/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: text,
+                        history: aiChatHistoryState
+                    })
+                });
+
+                aiChatHistoryState.push({ role: 'user', text });
+                aiChatHistoryState.push({ role: 'model', text: res.reply });
+
+                appendChatMessage(res.reply, 'bot');
+                updateAiBadges(res.is_ai_online);
+            } catch (err) {
+                appendChatMessage(`⚠️ **Error:** ${err.message}`, 'bot');
+            } finally {
+                if (indicator) indicator.style.display = 'none';
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+        };
+    }
+}
+
+function appendChatMessage(text, sender = 'bot') {
+    const messagesEl = document.getElementById('aiChatMessages');
+    if (!messagesEl) return;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `ai-msg ai-msg-${sender}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-msg-bubble';
+
+    if (sender === 'user') {
+        bubble.innerText = text;
+    } else {
+        bubble.innerHTML = formatMarkdownChat(text);
+    }
+
+    msgDiv.appendChild(bubble);
+    messagesEl.appendChild(msgDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Simple fast markdown parser for bot messages
+function formatMarkdownChat(raw) {
+    if (!raw) return '';
+    let parsed = escapeHtml(raw);
+
+    // Bold **text**
+    parsed = parsed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Italic *text*
+    parsed = parsed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Code `code`
+    parsed = parsed.replace(/`(.*?)`/g, '<code>$1</code>');
+    // Bullet lines
+    parsed = parsed.replace(/^[•\-\*]\s+(.*)$/gm, '&bull; $1');
+    // Newlines to <br>
+    parsed = parsed.replace(/\n/g, '<br>');
+
+    return parsed;
+}
+
+// 10. Gemini Config Modal Controller
+function initGeminiConfig() {
+    const form = document.getElementById('geminiConfigForm');
+    const modal = document.getElementById('geminiConfigModal');
+    const input = document.getElementById('gemini_api_key');
+    const notice = document.getElementById('geminiCurrentStatusNotice');
+    const removeBtn = document.getElementById('btnRemoveGeminiKey');
+    const toggleVisBtn = document.getElementById('toggleGeminiKeyVis');
+
+    // Open buttons
+    const openBtns = [
+        document.getElementById('openGeminiModalBtn'),
+        document.getElementById('openGeminiModalTopBtn'),
+        document.getElementById('aiChatConfigBtn')
+    ];
+
+    openBtns.forEach(btn => {
+        if (btn) {
+            btn.onclick = async (e) => {
+                e.preventDefault();
+                try {
+                    const cfg = await safeFetchJson(`${API_BASE}/ai/config`);
+                    if (cfg.has_key) {
+                        if (notice) {
+                            notice.style.display = 'block';
+                            notice.innerText = `✓ Gemini Flash is connected (${cfg.source === 'environment' ? 'via environment' : 'Key: ' + cfg.masked_key})`;
+                        }
+                        if (removeBtn && cfg.source !== 'environment') removeBtn.style.display = 'block';
+                    } else {
+                        if (notice) notice.style.display = 'none';
+                        if (removeBtn) removeBtn.style.display = 'none';
+                    }
+                    openModal(modal);
+                } catch (err) {
+                    openModal(modal);
+                }
+            };
+        }
+    });
+
+    if (toggleVisBtn && input) {
+        toggleVisBtn.onclick = () => {
+            input.type = input.type === 'password' ? 'text' : 'password';
+        };
+    }
+
+    if (form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const key = input.value.trim();
+
+            try {
+                const res = await safeFetchJson(`${API_BASE}/ai/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: key })
+                });
+
+                showToast(res.message, 'success');
+                closeModal(modal);
+                checkAiConfigStatus();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        };
+    }
+
+    if (removeBtn) {
+        removeBtn.onclick = async () => {
+            try {
+                const res = await safeFetchJson(`${API_BASE}/ai/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: '' })
+                });
+                if (input) input.value = '';
+                showToast(res.message, 'success');
+                closeModal(modal);
+                checkAiConfigStatus();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        };
+    }
+}
+
+// ====================================================
+// HARDWARE DAMAGE REPORTING & AI HEALTH DIAGNOSTICS
+// ====================================================
+
+function initDamageReporting() {
+    const reportModal = document.getElementById('damageReportModal');
+    const reportForm = document.getElementById('damageReportForm');
+    const assetSelect = document.getElementById('damageAssetSelect');
+    const infoStrip = document.getElementById('damageAssetInfoStrip');
+    const resultCard = document.getElementById('damageDiagnosticResultCard');
+    const btnSubmit = document.getElementById('btnRunDamageDiagnostic');
+    const spinner = document.getElementById('damageDiagBtnSpinner');
+
+    // Trigger buttons
+    const btnQuickReport = document.getElementById('btnQuickReportDamage');
+    if (btnQuickReport) {
+        btnQuickReport.addEventListener('click', (e) => {
+            e.preventDefault();
+            openDamageReportModal();
+        });
+    }
+
+    const topReportBtn = document.getElementById('topReportDamageBtn');
+    if (topReportBtn) {
+        topReportBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            openDamageReportModal();
+        });
+    }
+
+    // Asset selection change
+    if (assetSelect) {
+        assetSelect.addEventListener('change', () => {
+            const assetId = parseInt(assetSelect.value);
+            if (!assetId) {
+                if (infoStrip) infoStrip.style.display = 'none';
+                return;
+            }
+            updateDamageAssetStrip(assetId);
+        });
+    }
+
+    // Form submission
+    if (reportForm) {
+        reportForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const assetId = parseInt(assetSelect?.value);
+            if (!assetId) {
+                showToast('Please select a hardware asset to report damage', 'error');
+                return;
+            }
+
+            const category = document.getElementById('damageCategory')?.value || 'Display / Screen';
+            const severityRadio = document.querySelector('input[name="damage_severity"]:checked');
+            const severity = severityRadio ? severityRadio.value : 'High';
+            const description = document.getElementById('damageDescription')?.value.trim();
+            const reportedBy = document.getElementById('damageReportedBy')?.value.trim() || 'IT Helpdesk';
+            const markStatus = document.getElementById('damageMarkDamagedStatus')?.value || 'Damaged';
+
+            if (!description) {
+                showToast('Please describe the observed damage or symptoms', 'error');
+                return;
+            }
+
+            // UI loading state
+            if (btnSubmit) btnSubmit.disabled = true;
+            if (spinner) spinner.style.display = 'inline-block';
+
+            try {
+                const response = await safeFetchJson(`${API_BASE}/assets/${assetId}/report-damage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category,
+                        severity,
+                        description,
+                        reported_by: reportedBy,
+                        mark_status: markStatus
+                    })
+                });
+
+                showToast(`🔬 AI Diagnostic complete! Health recalibrated to ${response.incident.new_health_score}%`, 'success');
+
+                // Render result card
+                renderDamageDiagnosticResult(response.asset, response.incident);
+
+                // Refresh app state
+                loadAssets();
+                loadStats();
+                if (document.getElementById('aiTabPredictiveHealth')?.style.display !== 'none' && typeof loadAiIntelligenceHub === 'function') {
+                    loadAiIntelligenceHub();
+                }
+            } catch (err) {
+                showToast('Failed to run damage diagnostic: ' + err.message, 'error');
+            } finally {
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (spinner) spinner.style.display = 'none';
+            }
+        });
+    }
+}
+
+function updateDamageAssetStrip(assetId) {
+    const asset = assetsState.find(a => a.id === assetId);
+    const infoStrip = document.getElementById('damageAssetInfoStrip');
+    if (!asset || !infoStrip) return;
+
+    infoStrip.style.display = 'block';
+    document.getElementById('stripAssetName').innerText = `${asset.asset_name} (${asset.category})`;
+    document.getElementById('stripAssetMeta').innerText = `SN: ${asset.serial_number} | Status: ${asset.status} | Location: ${asset.location || 'Main Office'}`;
+
+    const healthBadge = document.getElementById('stripCurrentHealthBadge');
+    if (healthBadge) {
+        const curHealth = asset.health_score ?? (asset.damage_history?.[0]?.ai_diagnosis?.calculated_health_score ?? 85);
+        healthBadge.innerText = `${curHealth}% Health`;
+        healthBadge.className = `badge-pill ${curHealth < 40 ? 'red' : curHealth < 70 ? 'yellow' : 'green'}`;
+    }
+}
+
+window.openDamageReportModal = function(preselectedAssetId = null) {
+    const modal = document.getElementById('damageReportModal');
+    const assetSelect = document.getElementById('damageAssetSelect');
+    const resultCard = document.getElementById('damageDiagnosticResultCard');
+    const descInput = document.getElementById('damageDescription');
+    const btnFullDiag = document.getElementById('btnViewFullDiagnosticsFromDamage');
+
+    if (!modal) return;
+
+    // Reset results view
+    if (resultCard) resultCard.style.display = 'none';
+    if (btnFullDiag) btnFullDiag.style.display = 'none';
+    if (descInput) descInput.value = '';
+
+    // Populate asset dropdown
+    if (assetSelect) {
+        assetSelect.innerHTML = '<option value="">-- Select Asset to Report Damage --</option>';
+        assetsState.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.innerText = `[${a.serial_number}] ${a.asset_name} — ${a.status} (${a.category})`;
+            assetSelect.appendChild(opt);
+        });
+
+        if (preselectedAssetId) {
+            assetSelect.value = preselectedAssetId;
+            updateDamageAssetStrip(preselectedAssetId);
+        } else {
+            const infoStrip = document.getElementById('damageAssetInfoStrip');
+            if (infoStrip) infoStrip.style.display = 'none';
+        }
+    }
+
+    openModal(modal);
+};
+
+function renderDamageDiagnosticResult(asset, incident) {
+    const resultCard = document.getElementById('damageDiagnosticResultCard');
+    if (!resultCard) return;
+
+    const diag = incident.ai_diagnosis || {};
+
+    // Scores with robust fallbacks
+    const prevHealth = incident.previous_health_score ?? asset.health_score ?? 85;
+    const newHealth = incident.new_health_score ?? diag.calculated_health_score ?? 40;
+    const failProb = incident.failure_probability ?? diag.failure_probability_pct ?? 65;
+
+    document.getElementById('resPrevHealth').innerText = `${prevHealth}%`;
+    document.getElementById('resNewHealth').innerText = `${newHealth}%`;
+    document.getElementById('resFailProb').innerText = `${failProb}%`;
+    document.getElementById('resEstCost').innerText = diag.estimated_repair_cost || '₹1,500 - ₹3,500';
+
+    // Risk badge
+    const riskBadge = document.getElementById('diagResultRiskBadge');
+    if (riskBadge) {
+        const risk = incident.risk_level || 'CRITICAL';
+        riskBadge.innerText = `${risk.toUpperCase()} RISK`;
+        riskBadge.className = `badge-pill ${risk === 'Critical' ? 'red' : risk === 'High' ? 'orange' : risk === 'Moderate' ? 'yellow' : 'green'}`;
+    }
+
+    // Engine badge
+    const engineBadge = document.getElementById('diagEngineBadge');
+    if (engineBadge) {
+        engineBadge.innerText = `Engine: ${diag.ai_engine === 'gemini_flash_cloud' ? '⚡ Google Gemini 1.5 Flash' : '🧠 Built-in Deep Neural Rules'}`;
+    }
+
+    // Safety Alert Box
+    const safetyBox = document.getElementById('resSafetyAlertBox');
+    const safetyText = document.getElementById('resSafetyAlertText');
+    if (diag.safety_hazard_detected) {
+        if (safetyBox) safetyBox.style.display = 'block';
+        if (safetyText) safetyText.innerText = diag.safety_details || 'Immediate physical or electrical safety hazard detected. Disconnect power supply and isolate asset.';
+    } else {
+        if (safetyBox) safetyBox.style.display = 'none';
+    }
+
+    // Fault Mechanism
+    document.getElementById('resFaultMechanism').innerText = diag.fault_mechanism || 'Hardware diagnostic completed.';
+
+    // Repair & Warranty
+    document.getElementById('resRepairViability').innerText = diag.repair_viability || 'Viable via authorized OEM service';
+    document.getElementById('resWarrantyAssess').innerText = diag.warranty_claim_viability || 'Check OEM coverage';
+
+    // Directives
+    const dirList = document.getElementById('resDirectivesList');
+    if (dirList) {
+        dirList.innerHTML = '';
+        const directives = diag.recommended_directives || [diag.recommended_action || 'Submit device for service inspection'];
+        directives.forEach(d => {
+            const li = document.createElement('li');
+            li.innerText = d;
+            dirList.appendChild(li);
+        });
+    }
+
+    // Full diagnostics button
+    const btnFullDiag = document.getElementById('btnViewFullDiagnosticsFromDamage');
+    if (btnFullDiag) {
+        btnFullDiag.style.display = 'inline-flex';
+        btnFullDiag.onclick = () => {
+            closeModal(document.getElementById('damageReportModal'));
+            openAssetDiagnostics(asset.id);
+        };
+    }
+
+    resultCard.style.display = 'block';
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+

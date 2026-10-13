@@ -28,6 +28,11 @@
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
+                <a href="#" class="nav-item" id="navAiHubView" data-view="ai-hub">
+                    <span class="nav-icon">🤖</span>
+                    <span>AI & ML Intelligence</span>
+                    <span class="nav-ai-chip" id="navAiStatusChip">ML Ready</span>
+                </a>
                 <a href="#" class="nav-item" id="navAllocationsView" data-view="allocations">
                     <span class="nav-icon">👥</span>
                     <span>Device Allocations</span>
@@ -49,6 +54,10 @@
                 <a href="#" class="nav-item" id="btnQuickAdd">
                     <span class="nav-icon">➕</span>
                     <span>Add New Asset</span>
+                </a>
+                <a href="#" class="nav-item" id="btnQuickReportDamage" style="color: #f87171;">
+                    <span class="nav-icon">🚨</span>
+                    <span>Report Damage</span>
                 </a>
                 <a href="#" class="nav-item" id="btnExportCsv">
                     <span class="nav-icon">📊</span>
@@ -75,11 +84,17 @@
                         <p>Track, allocate, and optimize company hardware devices in real time</p>
                     </div>
                     <div class="top-actions" style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button class="btn btn-secondary" id="openGeminiModalTopBtn" title="Configure Gemini AI Assistant Settings">
+                            🤖 AI Settings
+                        </button>
                         <button class="btn btn-secondary" id="openSmtpModalBtn" title="Configure Real Email SMTP Server Settings">
                             ⚙️ Email Settings
                         </button>
                         <button class="btn btn-secondary" id="themeToggleBtn" title="Toggle Light/Dark Theme">
                             <span id="themeToggleIcon">🌙</span> <span id="themeToggleText">Dark Mode</span>
+                        </button>
+                        <button class="btn btn-warning" id="topReportDamageBtn" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-weight: 700;">
+                            <span>🚨</span> Report Damage
                         </button>
                         <button class="btn btn-primary" id="openAddModalBtn">
                             <span class="btn-icon">+</span> Add New Asset
@@ -227,6 +242,7 @@
                                     <th>Serial & Vendor</th>
                                     <th>Category & Location</th>
                                     <th>Status</th>
+                                    <th>AI Health & Risk</th>
                                     <th>Cost & Warranty</th>
                                     <th>Actions</th>
                                 </tr>
@@ -356,6 +372,248 @@
                         </div>
                     </div>
                 </section>
+            </div>
+
+            <!-- VIEW 4: AI & Machine Learning Intelligence Hub -->
+            <div id="aiHubViewSection" class="view-section" style="display: none;">
+                <!-- Top Header -->
+                <header class="top-bar">
+                    <div class="page-title">
+                        <div style="display: flex; align-items: center; gap: 0.65rem;">
+                            <h1>🤖 AI & ML Intelligence Hub</h1>
+                            <span class="badge-pill green" id="aiHubStatusIndicator">⚡ Built-in ML Active</span>
+                        </div>
+                        <p>Predictive maintenance, smart allocation recommendations, and real-time financial depreciation analytics</p>
+                    </div>
+                    <div class="top-actions" style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button class="btn btn-secondary" id="openGeminiModalBtn">
+                            ⚙️ Gemini API Key
+                        </button>
+                        <button class="btn btn-secondary" id="btnExportExecutiveBriefing">
+                            📑 Copy Executive Briefing
+                        </button>
+                        <button class="btn btn-primary" id="btnRunMlScan">
+                            <span>⚡</span> Refresh ML Diagnostics
+                        </button>
+                    </div>
+                </header>
+
+                <!-- AI KPI Cards Row -->
+                <section class="kpi-grid">
+                    <div class="kpi-card kpi-total">
+                        <div class="kpi-icon">🔮</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Fleet Health Index</span>
+                            <h2 id="aiKpiHealthAvg" class="kpi-value">--</h2>
+                            <span class="kpi-subtext" id="aiKpiHealthStatus">Computing risk...</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-damaged">
+                        <div class="kpi-icon">⚠️</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Failure Risk Alerts</span>
+                            <h2 id="aiKpiFailureRisk" class="kpi-value">--</h2>
+                            <span class="kpi-subtext" id="aiKpiFailureSub">0 Critical / 0 Moderate</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-available">
+                        <div class="kpi-icon">💰</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Current Fleet Book Value</span>
+                            <h2 id="aiKpiBookValue" class="kpi-value">--</h2>
+                            <span class="kpi-subtext" id="aiKpiDeprSub">DDB Depreciated</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card kpi-allocated">
+                        <div class="kpi-icon">🎯</div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Replacement Capex Due</span>
+                            <h2 id="aiKpiReplacementDue" class="kpi-value">--</h2>
+                            <span class="kpi-subtext" id="aiKpiReplacementSub">Units reaching end-of-life</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AI Hub Navigation Tabs -->
+                <div class="ai-tabs-container">
+                    <button class="ai-tab-btn active" data-tab="predictive-health">
+                        <span>🔮</span> Predictive Health & Maintenance
+                    </button>
+                    <button class="ai-tab-btn" data-tab="smart-recommender">
+                        <span>🎯</span> Smart ML Allocation Recommender
+                    </button>
+                    <button class="ai-tab-btn" data-tab="depreciation-forecast">
+                        <span>📈</span> Fleet Valuation & Depreciation
+                    </button>
+                    <button class="ai-tab-btn" data-tab="executive-briefing">
+                        <span>📑</span> AI Executive Health Briefing
+                    </button>
+                </div>
+
+                <!-- TAB 1: Predictive Health & Failure Risk Matrix -->
+                <div id="aiTabPredictiveHealth" class="ai-tab-content active">
+                    <div class="toolbar-card" style="margin-bottom: 1.25rem;">
+                        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">Risk Filter:</span>
+                            <button class="btn btn-xs btn-secondary active-filter" id="filterRiskAll">All Assets (<span id="countRiskAll">0</span>)</button>
+                            <button class="btn btn-xs btn-secondary" id="filterRiskCritical" style="color: var(--accent-red);">🔴 Critical Risk (<span id="countRiskCritical">0</span>)</button>
+                            <button class="btn btn-xs btn-secondary" id="filterRiskModerate" style="color: var(--accent-yellow);">🟡 Moderate Risk (<span id="countRiskModerate">0</span>)</button>
+                            <button class="btn btn-xs btn-secondary" id="filterRiskHealthy" style="color: var(--accent-green);">🟢 Healthy (<span id="countRiskHealthy">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>Hardware Fleet Predictive Risk Matrix</h2>
+                                <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Multi-factor ML health model based on service age, operating condition, warranty, and historical flags</p>
+                            </div>
+                            <span class="badge-count" id="aiScoredCountBadge">0 assets scored</span>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Hardware Asset</th>
+                                        <th>Category & Status</th>
+                                        <th>Health Score</th>
+                                        <th>Failure Risk</th>
+                                        <th>Est. Remaining Life</th>
+                                        <th>Recommended Action</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="aiPredictiveTableBody">
+                                    <!-- Dynamic Render -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Smart ML Allocation Recommender Lab -->
+                <div id="aiTabSmartRecommender" class="ai-tab-content" style="display: none;">
+                    <div class="panel" style="margin-bottom: 1.5rem;">
+                        <div class="panel-header">
+                            <div>
+                                <h2>🎯 Smart Hardware Compatibility Matcher</h2>
+                                <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Matches role requirements, hardware compute specs, and equipment health to recommend the ideal workstation</p>
+                            </div>
+                        </div>
+                        <div style="padding: 1.25rem;">
+                            <form id="aiRecommenderForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) auto; gap: 1rem; align-items: flex-end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="aiRecDept">Target Department *</label>
+                                    <select id="aiRecDept" class="custom-select" required>
+                                        <option value="Engineering" selected>Engineering / Software Dev</option>
+                                        <option value="Design">UI/UX & Product Design</option>
+                                        <option value="Product">Product Management</option>
+                                        <option value="Human Resources">Human Resources (HR)</option>
+                                        <option value="Sales">Sales & Marketing</option>
+                                        <option value="Finance">Finance & Operations</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="aiRecRole">Job Role / Designation</label>
+                                    <input type="text" id="aiRecRole" placeholder="e.g., Senior Fullstack Engineer">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="aiRecEmpName">Employee Name</label>
+                                    <input type="text" id="aiRecEmpName" placeholder="e.g., Rahul Verma">
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="height: 42px; display: flex; align-items: center; gap: 0.4rem;">
+                                    <span>🤖</span> Run AI Match
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Recommended Hardware Matches</h2>
+                            <span class="badge-pill blue" id="aiRecResultBadge">Ready to evaluate</span>
+                        </div>
+                        <div id="aiRecommenderResultsGrid" class="ai-recommendation-grid" style="padding: 1.25rem;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Fleet Valuation & Depreciation Forecaster -->
+                <div id="aiTabDepreciation" class="ai-tab-content" style="display: none;">
+                    <div class="analytics-charts-grid" style="margin-bottom: 1.5rem;">
+                        <div class="chart-card-premium">
+                            <div class="chart-header">
+                                <div>
+                                    <h3 class="chart-title">💰 Fleet Capital Value vs Depreciated Worth</h3>
+                                    <span class="chart-subtitle">Double Declining Balance & Straight-Line Analysis</span>
+                                </div>
+                            </div>
+                            <div class="chart-canvas-container">
+                                <canvas id="aiDepreciationChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card-premium">
+                            <div class="chart-header">
+                                <div>
+                                    <h3 class="chart-title">⏳ 3-Year Future Valuation Forecast</h3>
+                                    <span class="chart-subtitle">Projected salvage and book values</span>
+                                </div>
+                            </div>
+                            <div class="chart-canvas-container">
+                                <canvas id="aiValuationForecastChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>⚠️ Replacement & End-of-Life Watchlist</h2>
+                                <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Assets exceeding or nearing their rated depreciation life (Capex replacement planning)</p>
+                            </div>
+                            <span class="badge-count" id="aiReplacementCountBadge">0 items</span>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Asset Name</th>
+                                        <th>Category</th>
+                                        <th>Purchase Cost</th>
+                                        <th>Current Book Value</th>
+                                        <th>Service Age</th>
+                                        <th>Lifespan Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="aiReplacementTableBody">
+                                    <!-- Dynamic Render -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: AI Executive Health Briefing -->
+                <div id="aiTabExecutiveBriefing" class="ai-tab-content" style="display: none;">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2>📑 Automated IT Infrastructure Briefing</h2>
+                                <span class="badge-pill green">AI Generated Synthesis</span>
+                            </div>
+                            <button class="btn btn-secondary btn-xs" id="btnCopyBriefingText">📋 Copy Report</button>
+                        </div>
+                        <div id="aiExecutiveBriefingContent" style="padding: 1.5rem; line-height: 1.7; font-size: 0.95rem;">
+                            <!-- Dynamic Content -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -674,6 +932,357 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save SMTP Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FLOATING AI ASSISTANT CHATBOT WIDGET -->
+    <div id="aiChatWidget" class="ai-chat-widget">
+        <!-- Floating Toggle Pill / Circle -->
+        <button id="aiChatToggleBtn" class="ai-chat-toggle-btn" title="Open AssetBot AI Assistant">
+            <span class="ai-chat-pulse"></span>
+            <span class="ai-chat-icon">🤖</span>
+            <span class="ai-chat-label">AssetBot AI</span>
+        </button>
+
+        <!-- Chat Popup Window -->
+        <div id="aiChatWindow" class="ai-chat-window" style="display: none;">
+            <!-- Header -->
+            <div class="ai-chat-header">
+                <div class="ai-chat-title-group">
+                    <div class="ai-avatar-badge">🤖</div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #ffffff;">AssetBot AI</h4>
+                        <span id="aiChatOnlineStatus" class="ai-status-online">● Built-in ML Mode</span>
+                    </div>
+                </div>
+                <div class="ai-chat-header-actions">
+                    <button id="aiChatConfigBtn" class="ai-header-btn" title="Gemini API Key Settings">⚙️</button>
+                    <button id="aiChatClearBtn" class="ai-header-btn" title="Clear Conversation">🗑️</button>
+                    <button id="aiChatCloseBtn" class="ai-header-btn" title="Minimize Chat">&times;</button>
+                </div>
+            </div>
+
+            <!-- Quick Suggestions Bar -->
+            <div class="ai-chat-suggestions" id="aiChatSuggestions">
+                <button class="ai-chip-btn" data-query="Kitne laptops available hain?">📦 Available Laptops</button>
+                <button class="ai-chip-btn" data-query="High-risk and damaged devices dikhao">⚠️ Risk Diagnostic</button>
+                <button class="ai-chip-btn" data-query="Total fleet valuation aur depreciation kitna hai?">💰 Fleet Valuation</button>
+                <button class="ai-chip-btn" data-query="MacBook kiske paas allocated hai?">👤 MacBook Allocations</button>
+                <button class="ai-chip-btn" data-query="Recommend best asset for Software Engineer in Engineering">🎯 Engineering Recommendation</button>
+            </div>
+
+            <!-- Messages Log -->
+            <div id="aiChatMessages" class="ai-chat-messages">
+                <div class="ai-msg ai-msg-bot">
+                    <div class="ai-msg-bubble">
+                        👋 <strong>Namaste! Main AssetBot AI hoon.</strong><br>
+                        Main aapki IT hardware inventory, failure risks, allocations, aur depreciation valuation me help kar sakta hoon.<br><br>
+                        <em>Kuch bhi poochiye ya upar diye gaye chips par click kijiye!</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="aiChatTypingIndicator" class="ai-typing-indicator" style="display: none;">
+                <span></span><span></span><span></span>
+                <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.35rem;">AssetBot is analyzing inventory...</span>
+            </div>
+
+            <!-- Input Bar -->
+            <form id="aiChatForm" class="ai-chat-input-bar">
+                <input type="text" id="aiChatInput" placeholder="Ask about assets, failure risks, employees..." autocomplete="off">
+                <button type="submit" class="ai-send-btn" title="Send Question">➤</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 5: Single Asset AI Diagnostics -->
+    <div id="aiDiagnosticsModal" class="modal-backdrop">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.3rem;">🔬</span>
+                    <h3 id="diagModalTitle">Hardware AI Diagnostic Report</h3>
+                </div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="diag-header-card">
+                    <div>
+                        <h4 id="diagAssetName" style="margin: 0; font-size: 1.15rem; color: var(--text-main);">--</h4>
+                        <p id="diagSerial" style="margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-muted);">--</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="diagHealthPill" class="badge-pill green" style="font-size: 0.95rem; font-weight: 700; padding: 0.4rem 0.85rem;">--</span>
+                        <div id="diagRiskLabel" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Failure Risk: --</div>
+                    </div>
+                </div>
+
+                <div class="diag-metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; margin: 1rem 0;">
+                    <div class="diag-metric-box">
+                        <span class="diag-label">Failure Probability</span>
+                        <h3 id="diagFailPct" style="margin: 0.2rem 0 0; color: var(--accent-red);">--%</h3>
+                    </div>
+                    <div class="diag-metric-box">
+                        <span class="diag-label">Est. Remaining Useful Life</span>
+                        <h3 id="diagRulMonths" style="margin: 0.2rem 0 0; color: var(--accent-blue);">-- mo</h3>
+                    </div>
+                    <div class="diag-metric-box">
+                        <span class="diag-label">Projected EOL Date</span>
+                        <h3 id="diagFailureDate" style="margin: 0.2rem 0 0; color: var(--text-main);">--</h3>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-main);">🔍 AI Risk Factors Identified</h4>
+                    <ul id="diagRiskFactorsList" style="margin: 0; padding-left: 1.25rem; font-size: 0.88rem; line-height: 1.6; color: var(--text-muted);">
+                    </ul>
+                </div>
+
+                <div style="margin-top: 1.25rem; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 0.85rem;">
+                    <strong style="color: var(--accent-blue); font-size: 0.88rem;">💡 Recommended Preventive Action:</strong>
+                    <p id="diagRecommendedAction" style="margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--text-main); line-height: 1.5;">--</p>
+                </div>
+
+                <!-- Damage History / Incidents Section -->
+                <div id="diagDamageHistoryContainer" style="margin-top: 1.25rem; display: none;">
+                    <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #ef4444; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>🚨</span> Logged Damage Incidents & AI Diagnostics
+                    </h4>
+                    <div id="diagDamageHistoryList" style="display: flex; flex-direction: column; gap: 0.6rem;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning" id="btnDiagReportDamage" style="margin-right: auto; display: flex; align-items: center; gap: 0.35rem;">
+                    <span>🚨</span> Report Damage & Diagnose
+                </button>
+                <button type="button" class="btn btn-secondary modal-close-btn">Close Diagnostics</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 6: Gemini AI Settings -->
+    <div id="geminiConfigModal" class="modal-backdrop">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.3rem;">🤖</span>
+                    <h3>Google Gemini AI Configuration</h3>
+                </div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="geminiConfigForm">
+                <div class="modal-body">
+                    <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); padding: 0.85rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--text-main); line-height: 1.5;">
+                        <strong style="color: var(--accent-blue);">⚡ Hybrid AI Engine Active:</strong>
+                        <p style="color: var(--text-muted); margin: 0.35rem 0 0;">
+                            Without an API key, our <strong>Built-in Offline ML & NLP Engine</strong> answers queries instantly for free.
+                            <br><br>
+                            To unlock Google's live <strong>Gemini 1.5 Flash</strong> conversational intelligence, paste your free Google AI Studio API Key below.
+                            <br>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-yellow); font-weight: 700; text-decoration: underline;">Get Free Gemini API Key &rarr;</a>
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="gemini_api_key">Gemini API Key</label>
+                        <div style="position: relative;">
+                            <input type="password" id="gemini_api_key" placeholder="AIzaSy..." style="padding-right: 40px;">
+                            <button type="button" id="toggleGeminiKeyVis" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem;" title="Show/Hide Key">👁️</button>
+                        </div>
+                        <small style="color: var(--text-muted); font-size: 0.74rem;">Leave blank and save to revert to offline ML mode anytime.</small>
+                    </div>
+
+                    <div id="geminiCurrentStatusNotice" style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--accent-green); display: none;">
+                        ✓ Gemini Flash is currently configured and active.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-xs" id="btnRemoveGeminiKey" style="margin-right: auto; display: none;">Remove Key</button>
+                    <button type="submit" class="btn btn-primary">Save & Connect Gemini</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 7: Hardware Damage Reporting & AI Health Diagnostics -->
+    <div id="damageReportModal" class="modal-backdrop">
+        <div class="modal-card modal-lg" style="max-width: 760px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.4rem;">🚨</span>
+                    <div>
+                        <h3 style="margin: 0;">Hardware Damage Report & AI Diagnostics</h3>
+                        <p style="margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--text-muted);">
+                            Submit physical or operational defects — AI will diagnose root causes and recalculate asset health & risk
+                        </p>
+                    </div>
+                </div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="damageReportForm">
+                <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+                    <!-- Step 1: Asset Selection -->
+                    <div class="form-group">
+                        <label for="damageAssetSelect">Target Hardware Asset <span style="color: #ef4444;">*</span></label>
+                        <select id="damageAssetSelect" required>
+                            <option value="">-- Select Asset to Report Damage --</option>
+                        </select>
+                    </div>
+
+                    <!-- Selected Asset Info Strip -->
+                    <div id="damageAssetInfoStrip" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                            <div>
+                                <strong id="stripAssetName" style="color: var(--text-main); font-size: 0.95rem;">--</strong>
+                                <div id="stripAssetMeta" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem;">--</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Current Health:</span>
+                                <span id="stripCurrentHealthBadge" class="badge-pill green" style="font-weight: 700;">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <!-- Damage Category -->
+                        <div class="form-group">
+                            <label for="damageCategory">Defect / Damage Category <span style="color: #ef4444;">*</span></label>
+                            <select id="damageCategory" required>
+                                <option value="Display / Screen">🖥️ Display / Screen (Cracked, lines, flickering)</option>
+                                <option value="Battery & Power">🔋 Battery & Power (Swelling, overheating, not charging)</option>
+                                <option value="Physical Chassis & Hinges">💥 Physical Impact / Hinges (Drop, crack, bent)</option>
+                                <option value="Motherboard / Ports">⚡ Motherboard & Ports (Burnt, short, no power)</option>
+                                <option value="Fluid / Liquid Ingress">💧 Fluid / Liquid Spill (Water, coffee, corrosion)</option>
+                                <option value="Storage & Peripherals">💾 Storage / Fan / Peripherals (Loud fan, SSD fault)</option>
+                            </select>
+                        </div>
+
+                        <!-- Severity Selector -->
+                        <div class="form-group">
+                            <label>Damage Severity <span style="color: #ef4444;">*</span></label>
+                            <div class="damage-severity-picker" id="damageSeverityPicker">
+                                <label class="severity-radio low">
+                                    <input type="radio" name="damage_severity" value="Low">
+                                    <span>🟢 Low</span>
+                                </label>
+                                <label class="severity-radio medium">
+                                    <input type="radio" name="damage_severity" value="Medium">
+                                    <span>🟡 Medium</span>
+                                </label>
+                                <label class="severity-radio high">
+                                    <input type="radio" name="damage_severity" value="High" checked>
+                                    <span>🟠 High</span>
+                                </label>
+                                <label class="severity-radio critical">
+                                    <input type="radio" name="damage_severity" value="Critical">
+                                    <span>🔴 Critical</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Defect Description -->
+                    <div class="form-group">
+                        <label for="damageDescription">Symptoms & Defect Description <span style="color: #ef4444;">*</span></label>
+                        <textarea id="damageDescription" rows="3" placeholder="Describe symptoms: e.g., 'Laptop fell from desk, screen glass cracked with black blotch and vertical purple lines. Device powers on but displays thermal fan warning.'" required></textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="damageReportedBy">Reported By</label>
+                            <input type="text" id="damageReportedBy" placeholder="e.g. IT Helpdesk / Rahul Kumar">
+                        </div>
+                        <div class="form-group">
+                            <label for="damageMarkDamagedStatus">Update Asset Status</label>
+                            <select id="damageMarkDamagedStatus">
+                                <option value="Damaged" selected>Set Status to 'Damaged'</option>
+                                <option value="Under Maintenance">Set Status to 'Under Maintenance'</option>
+                                <option value="keep">Keep Current Status</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button Row -->
+                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                        <button type="submit" id="btnRunDamageDiagnostic" class="btn btn-danger" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; padding: 0.65rem 1.25rem;">
+                            <span id="damageDiagBtnSpinner" style="display: none;">⚙️</span>
+                            <span>🔬 Run AI Diagnostic & Recalibrate Health</span>
+                        </button>
+                    </div>
+
+                    <!-- AI Diagnostic Result Card (Generated Post-Submission) -->
+                    <div id="damageDiagnosticResultCard" style="display: none; margin-top: 1.5rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 1.25rem; box-shadow: 0 8px 32px rgba(0,0,0,0.37);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.85rem; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.4rem;">🤖</span>
+                                <div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #fff;">AI Damage Diagnostic & Health Analysis</h4>
+                                    <span id="diagEngineBadge" style="font-size: 0.72rem; color: var(--accent-yellow); font-family: monospace;">Engine: Hybrid Neural Diagnostics</span>
+                                </div>
+                            </div>
+                            <span id="diagResultRiskBadge" class="badge-pill red" style="font-size: 0.85rem; font-weight: 800; padding: 0.35rem 0.75rem;">CRITICAL RISK</span>
+                        </div>
+
+                        <!-- Before & After Score Grid -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Prior Health</div>
+                                <div id="resPrevHealth" style="font-size: 1.3rem; font-weight: 800; color: var(--text-muted); margin-top: 0.2rem;">--</div>
+                            </div>
+                            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 0.72rem; color: #ef4444; text-transform: uppercase; font-weight: 700;">New Health Score</div>
+                                <div id="resNewHealth" style="font-size: 1.4rem; font-weight: 900; color: #ef4444; margin-top: 0.2rem;">--</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Failure Prob.</div>
+                                <div id="resFailProb" style="font-size: 1.3rem; font-weight: 800; color: #f59e0b; margin-top: 0.2rem;">--</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Est. Repair Cost</div>
+                                <div id="resEstCost" style="font-size: 1.15rem; font-weight: 800; color: var(--accent-green); margin-top: 0.2rem;">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Safety Alert Banner if any -->
+                        <div id="resSafetyAlertBox" style="display: none; background: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.84rem; color: #fca5a5;">
+                            <strong>⚠️ Safety Hazard Warning:</strong>
+                            <span id="resSafetyAlertText">--</span>
+                        </div>
+
+                        <!-- Fault Mechanism / Root Cause -->
+                        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 0.85rem; margin-bottom: 0.85rem;">
+                            <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-yellow); margin-bottom: 0.35rem;">🔬 Internal Fault Mechanism & Hardware Root Cause:</div>
+                            <p id="resFaultMechanism" style="margin: 0; font-size: 0.85rem; color: var(--text-main); line-height: 1.55;">--</p>
+                        </div>
+
+                        <!-- 2-col info: Repair Viability & Warranty -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Repair Viability:</span>
+                                <div id="resRepairViability" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-top: 0.15rem;">--</div>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Warranty Assessment:</span>
+                                <div id="resWarrantyAssess" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-top: 0.15rem;">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Action Directives -->
+                        <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 0.85rem;">
+                            <strong style="color: var(--accent-blue); font-size: 0.82rem;">📋 AI Recommended Directives:</strong>
+                            <ul id="resDirectivesList" style="margin: 0.4rem 0 0; padding-left: 1.25rem; font-size: 0.82rem; color: var(--text-main); line-height: 1.5;"></ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close-btn">Close</button>
+                    <button type="button" id="btnViewFullDiagnosticsFromDamage" class="btn btn-primary" style="display: none;">
+                        <span>🔬</span> View Full Asset Diagnostics
+                    </button>
                 </div>
             </form>
         </div>

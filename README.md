@@ -16,6 +16,12 @@ Designed for IT Administrators, Ops Leads, and Asset Managers to track hardware 
 
 | Feature | Description |
 | :--- | :--- |
+| 🤖 **AssetBot AI Assistant (Hybrid Mode)** | Floating conversational AI assistant powered by **Google Gemini 1.5 Flash** with automatic fallback to **Built-in Offline ML NLP Engine**. Answers natural language queries in English & Hindi/Hinglish! |
+| 🔮 **Predictive Maintenance & Risk ML** | Machine learning multi-factor health degradation model calculating **Health Score (0-100%)**, **Failure Probability %**, **Remaining Useful Life (months)**, and preventive maintenance actions. |
+| 🚨 **Hardware Damage & AI Diagnostics** | 1-Click damage reporting with instant AI fault mechanism diagnosis, health recalibration, safety hazard alerts, and OEM repair cost estimates in ₹ INR. |
+| 🎯 **Smart ML Allocation Recommender** | Hardware compatibility matching engine recommending ideal devices based on employee role, department affinity, computing specs, and equipment health. |
+| 💰 **Depreciation & Valuation Forecaster** | **Double-Declining Balance (DDB)** & MACRS financial model forecasting current book value, salvage rate, and 3-year residual fleet valuation. |
+| 📑 **AI Executive Briefing Generator** | 1-click automated executive briefing synthesizing fleet health index, capital risk, capex replacement alerts, and actionable recommendations. |
 | 📊 **Visual Analytics Dashboard** | Real-time **Chart.js** Doughnut & Gradient Bar charts showing Category Distribution, Department Equipment Cost (in ₹ Lakhs/Thousands), and Asset Status Breakdown with custom center metrics. |
 | ⚠️ **Warranty Expiry Alerts** | Automated system tracking assets with warranty expiring within 30 days (`⚠️ Xd left` / `🔴 Expired`), featuring a top high-priority alert banner and 1-click filter. |
 | 📱 **Employee Phone & SMS Dispatch** | Mandatory phone tracking during allocation with real-time SMS dispatch logger (Fast2SMS / Twilio SMS gateway integration ready). |
@@ -34,6 +40,9 @@ Designed for IT Administrators, Ops Leads, and Asset Managers to track hardware 
 graph TD
     Client[📱 Web Browser Frontend / HTML5 + CSS3 + App.js]
     ExpressServer[🚀 Express Node.js Server / server.js]
+    AIService[🧠 AI & ML Service / ai-service.js]
+    GeminiAPI[✨ Google Gemini 1.5 Flash Cloud LLM]
+    LocalML[⚡ Built-in Offline ML & NLP Engine]
     JSONDB[(🗄️ JSON Database / data/db.json)]
     SMTP[📧 SMTP Transporter / Nodemailer]
     OCR[📷 Tesseract.js OCR Engine]
@@ -42,6 +51,9 @@ graph TD
     Client -->|REST API Requests / JSON| ExpressServer
     ExpressServer -->|Read / Write State| JSONDB
     Client -->|Client-Side Text Scanning| OCR
+    ExpressServer -->|AI Chat & Analytics| AIService
+    AIService -->|Cloud Intelligence| GeminiAPI
+    AIService -->|Offline Fallback & Health ML| LocalML
     ExpressServer -->|Dispatch Transactional Emails| SMTP
     ExpressServer -->|Trigger SMS Dispatch| SMS
 ```

@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const aiService = require('./ai-service');
 
 const app = express();
 const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
@@ -327,8 +328,10 @@ app.get('/api/assets', (req, res) => {
 
     let result = data.assets.map(asset => {
         const alloc = data.allocations.find(a => a.asset_id === asset.id);
+        const health = aiService.calculateAssetHealthAndRisk(asset);
         return {
             ...asset,
+            health,
             allocation: alloc || null
         };
     });
@@ -634,6 +637,235 @@ app.get('/api/allocations', (req, res) => {
 app.get('/api/email-logs', (req, res) => {
     const data = readData();
     res.json(data.email_logs.slice(0, 5));
+});
+
+// ----------------------------------------------------
+// AI & MACHINE LEARNING API ROUTES
+// ----------------------------------------------------
+
+// AI 1. Get Predictive Health Analytics across Fleet
+app.get('/api/ai/predictive-health', (req, res) => {
+    const data = readData();
+    const analytics = aiService.getFleetPredictiveAnalytics(data.assets);
+    res.json(analytics);
+});
+
+// AI 2. Get Single Asset Diagnostics
+app.get('/api/assets/:id/diagnostics', (req, res) => {
+    const data = readData();
+    const assetId = parseInt(req.params.id);
+    const asset = data.assets.find(a => a.id === assetId);
+    if (!asset) {
+        return res.status(404).json({ error: 'Asset not found' });
+    }
+    const alloc = data.allocations.find(a => a.asset_id === asset.id);
+    const health = aiService.calculateAssetHealthAndRisk(asset);
+    res.json({
+        asset,
+        allocation: alloc || null,
+        diagnostics: health
+    });
+});
+
+// AI 2.1. Report Asset Damage & Run AI Health Diagnostic
+app.post('/api/assets/:id/report-damage', async (req, res) => {
+    const data = readData();
+    const assetId = parseInt(req.params.id);
+    const asset = data.assets.find(a => a.id === assetId);
+
+    if (!asset) {
+        return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const {
+        issue_title,
+        issue_category,
+        category,
+        severity,
+        description,
+        reported_by,
+        reporter_role,
+        mark_status,
+        update_asset_status
+    } = req.body;
+
+    const apiKey = (data.gemini_config && data.gemini_config.api_key) 
+        ? data.gemini_config.api_key 
+        : (process.env.GEMINI_API_KEY || '');
+    const model = (data.gemini_config && data.gemini_config.model) || 'gemini-1.5-flash';
+
+    try {
+        const cat = category || issue_category || 'Display / Screen';
+        const sev = severity || 'High';
+        const currentHealth = asset.health_score ?? (asset.damage_history?.[0]?.ai_diagnosis?.calculated_health_score ?? 85);
+
+        const reportData = {
+            issue_title: issue_title || `${cat} Incident`,
+            issue_category: cat,
+            category: cat,
+            severity: sev,
+            description: description || 'Damage reported by user.',
+            reported_by: reported_by || 'IT Staff',
+            reporter_role: reporter_role || 'Employee'
+        };
+
+        const diagnosis = await aiService.analyzeDamageReportAndDiagnose(asset, reportData, apiKey, model);
+
+        if (!asset.damage_history) {
+            asset.damage_history = [];
+        }
+
+        const newHealth = diagnosis.calculated_health_score;
+
+        const incidentRecord = {
+            id: `INC-${Date.now()}`,
+            reported_at: new Date().toISOString(),
+            ...reportData,
+            previous_health_score: currentHealth,
+            new_health_score: newHealth,
+            failure_probability: diagnosis.failure_probability_pct,
+            risk_level: diagnosis.risk_level,
+            ai_diagnosis: diagnosis
+        };
+
+        asset.damage_history.unshift(incidentRecord);
+        asset.health_score = newHealth;
+
+        // Update status and condition
+        if (update_asset_status !== false) {
+            if (mark_status && mark_status !== 'keep') {
+                asset.status = mark_status;
+            } else if (!mark_status) {
+                asset.status = (sev === 'Critical' || diagnosis.risk_level === 'CRITICAL') 
+                    ? 'Damaged' 
+                    : 'Under Maintenance';
+            }
+            asset.condition = (sev === 'Critical') ? 'Damaged / Defective' : 'Degraded';
+            const dateStr = new Date().toLocaleDateString('en-IN');
+            asset.notes = `${asset.notes ? asset.notes + ' | ' : ''}Damage Log (${dateStr}): ${cat} - ${(description || '').slice(0, 60)}`;
+        }
+
+        writeData(data);
+
+        // Recalculate fleet health
+        const updatedHealth = aiService.calculateAssetHealthAndRisk(asset);
+
+        res.json({
+            success: true,
+            message: 'Damage report analyzed and AI Health Diagnostics generated.',
+            incident: incidentRecord,
+            diagnosis,
+            updated_health: updatedHealth,
+            asset
+        });
+    } catch (err) {
+        console.error('[DAMAGE REPORT ERROR]:', err);
+        res.status(500).json({ error: 'Failed to process damage report', details: err.message });
+    }
+});
+
+// AI 2.2. Get Damage Incident History
+app.get('/api/assets/:id/damage-history', (req, res) => {
+    const data = readData();
+    const assetId = parseInt(req.params.id);
+    const asset = data.assets.find(a => a.id === assetId);
+
+    if (!asset) {
+        return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    res.json({
+        asset_id: asset.id,
+        asset_name: asset.asset_name,
+        serial_number: asset.serial_number,
+        status: asset.status,
+        damage_history: asset.damage_history || []
+    });
+});
+
+// AI 3. Smart ML Recommender for Employee Allocation
+app.post('/api/ai/recommend-asset', (req, res) => {
+    const data = readData();
+    const { department, role, employee_name } = req.body;
+    const recommendations = aiService.recommendAssetsForEmployee(data.assets, {
+        department: department || 'General',
+        role: role || '',
+        employee_name: employee_name || ''
+    });
+    res.json(recommendations);
+});
+
+// AI 4. Financial Depreciation & Resale Valuation Forecast
+app.get('/api/ai/depreciation', (req, res) => {
+    const data = readData();
+    const valuation = aiService.calculateDepreciationAndValuation(data.assets);
+    res.json(valuation);
+});
+
+// AI 5. AI Executive Briefing / Summary
+app.get('/api/ai/executive-summary', (req, res) => {
+    const data = readData();
+    const briefing = aiService.generateExecutiveBriefing(data.assets, data.allocations);
+    res.json(briefing);
+});
+
+// AI 6. Hybrid Gemini AI & Built-in NLP Conversational Assistant
+app.post('/api/ai/chat', async (req, res) => {
+    const data = readData();
+    const { message, history } = req.body;
+    const apiKey = (data.gemini_config && data.gemini_config.api_key) 
+        ? data.gemini_config.api_key 
+        : (process.env.GEMINI_API_KEY || '');
+    const model = (data.gemini_config && data.gemini_config.model) || 'gemini-1.5-flash';
+
+    try {
+        const response = await aiService.processChatQuery({
+            message,
+            history: history || [],
+            assets: data.assets,
+            allocations: data.allocations,
+            apiKey,
+            model
+        });
+        res.json(response);
+    } catch (err) {
+        console.error('[AI CHAT ERROR]:', err);
+        res.status(500).json({ error: 'Failed to process AI chat query', details: err.message });
+    }
+});
+
+// AI 7. Get Gemini AI Configuration
+app.get('/api/ai/config', (req, res) => {
+    const data = readData();
+    const cfg = data.gemini_config || {};
+    const hasEnvKey = Boolean(process.env.GEMINI_API_KEY);
+    res.json({
+        has_key: Boolean(cfg.api_key || hasEnvKey),
+        model: cfg.model || 'gemini-1.5-flash',
+        source: cfg.api_key ? 'stored_config' : (hasEnvKey ? 'environment' : 'none'),
+        masked_key: cfg.api_key ? (cfg.api_key.slice(0, 4) + '...' + cfg.api_key.slice(-4)) : ''
+    });
+});
+
+// AI 8. Save Gemini AI Configuration
+app.post('/api/ai/config', (req, res) => {
+    const data = readData();
+    const { api_key, model } = req.body;
+
+    if (!api_key || !api_key.trim()) {
+        if (data.gemini_config) delete data.gemini_config;
+        writeData(data);
+        return res.json({ message: 'Gemini API Key removed. Reverted to built-in offline ML engine.', has_key: false });
+    }
+
+    data.gemini_config = {
+        api_key: api_key.trim(),
+        model: model || 'gemini-1.5-flash',
+        updated_at: new Date().toISOString()
+    };
+    writeData(data);
+
+    res.json({ message: 'Gemini API Key saved successfully! Live Gemini 1.5 Flash activated.', has_key: true });
 });
 
 // Fallback 404 JSON Handler for unmatched /api/* endpoints
